@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}教授管理 - 自动套磁邮件系统{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-person-plus"></i> 添加教授信息</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="professor-form">
+                            <div class="mb-3">
+                                <label for="prof-name" class="form-label">姓名 *</label>
+                                <input type="text" class="form-control" id="prof-name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="prof-email" class="form-label">邮箱 *</label>
+                                <input type="email" class="form-control" id="prof-email" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="prof-university" class="form-label">大学 *</label>
+                                <input type="text" class="form-control" id="prof-university" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="prof-department" class="form-label">院系</label>
+                                <input type="text" class="form-control" id="prof-department">
+                            </div>
+                            <div class="mb-3">
+                                <label for="prof-research" class="form-label">研究领域</label>
+                                <textarea class="form-control" id="prof-research" rows="3"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="prof-introduction" class="form-label">教授介绍</label>
+                                <textarea class="form-control" id="prof-introduction" rows="4"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-plus-circle"></i> 添加教授
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="bi bi-list"></i> 教授列表</h5>
+                        <div class="btn-group">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="downloadTemplate()">
+                                <i class="bi bi-download"></i> 下载模板
+                            </button>
+                            <button class="btn btn-outline-info btn-sm" onclick="showImportModal()">
+                                <i class="bi bi-upload"></i> 导入CSV
+                            </button>
+                            <button class="btn btn-outline-success btn-sm" onclick="exportProfessors()">
+                                <i class="bi bi-file-earmark-spreadsheet"></i> 导出
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm" onclick="loadProfessors()">
+                                <i class="bi bi-arrow-clockwise"></i> 刷新
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- 搜索和筛选 -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <input type="text" class="form-control" id="searchInput" placeholder="搜索教授姓名或邮箱..." onkeyup="filterProfessors()">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="universityFilter" onchange="filterProfessors()">
+                                    <option value="">所有学校</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="departmentFilter" onchange="filterProfessors()">
+                                    <option value="">所有院系</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                                    <i class="bi bi-x-circle"></i> 清除
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="professors-list">
+                            <!-- 教授列表将在这里动态加载 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入CSV模态框 -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">导入教授信息</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="import-form" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="csv-file" class="form-label">选择CSV文件</label>
+                            <input type="file" class="form-control" id="csv-file" accept=".csv" required>
+                            <div class="form-text">请确保CSV文件包含以下列：姓名, 邮箱, 大学, 院系, 研究领域, 教授介绍</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="skip-duplicates" checked>
+                                <label class="form-check-label" for="skip-duplicates">
+                                    跳过重复邮箱
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="importProfessors()">导入</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑教授模态框 -->
+    <div class="modal fade" id="editProfessorModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑教授信息</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-professor-form">
+                        <input type="hidden" id="edit-prof-id">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit-prof-name" class="form-label">姓名 *</label>
+                                    <input type="text" class="form-control" id="edit-prof-name" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit-prof-email" class="form-label">邮箱 *</label>
+                                    <input type="email" class="form-control" id="edit-prof-email" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit-prof-university" class="form-label">大学 *</label>
+                                    <input type="text" class="form-control" id="edit-prof-university" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit-prof-department" class="form-label">院系</label>
+                                    <input type="text" class="form-control" id="edit-prof-department">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-prof-research" class="form-label">研究领域</label>
+                            <textarea class="form-control" id="edit-prof-research" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-prof-introduction" class="form-label">教授介绍</label>
+                            <textarea class="form-control" id="edit-prof-introduction" rows="4"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-prof-website" class="form-label">个人网站</label>
+                            <input type="url" class="form-control" id="edit-prof-website" placeholder="https://">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="updateProfessor()">保存更改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

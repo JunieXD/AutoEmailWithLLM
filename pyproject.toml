@@ -1,0 +1,21 @@
+[project]
+name = "autoemailwithllm"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "bcrypt>=4.3.0",
+    "cryptography>=45.0.7",
+    "flask>=3.1.2",
+    "flask-cors>=6.0.1",
+    "flask-sqlalchemy>=3.1.1",
+    "loguru>=0.7.3",
+    "marshmallow>=4.0.1",
+    "openai>=1.106.1",
+    "pandas>=2.3.2",
+    "python-docx>=1.2.0",
+    "python-dotenv>=1.1.1",
+    "pytz>=2025.2",
+    "requests>=2.32.5",
+]

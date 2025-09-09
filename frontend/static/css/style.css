@@ -1,0 +1,750 @@
+/* 自定义样式 */
+
+:root {
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #0dcaf0;
+    --light-color: #f8f9fa;
+    --dark-color: #212529;
+    --border-radius: 0.5rem;
+    --box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    --transition: all 0.3s ease;
+}
+
+/* 全局样式 */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    line-height: 1.6;
+}
+
+/* 导航栏样式 */
+.navbar {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand {
+    font-weight: 600;
+    font-size: 1.25rem;
+}
+
+.nav-link {
+    font-weight: 500;
+    transition: var(--transition);
+    cursor: pointer;
+}
+
+.nav-link:hover {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.nav-link.active {
+    color: #fff !important;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: var(--border-radius);
+}
+
+/* 卡片样式 */
+.card {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    transition: var(--transition);
+    margin-bottom: 1.5rem;
+}
+
+/* 卡片内容Flexbox布局 - 解决按钮高度不一致问题 */
+.card-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.card-text {
+    flex-grow: 1;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    background-color: var(--light-color);
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+    padding: 1rem 1.25rem;
+}
+
+.card-header h5 {
+    margin: 0;
+    color: var(--dark-color);
+}
+
+/* 表单样式 */
+.form-control, .form-select {
+    border-radius: var(--border-radius);
+    border: 1px solid #ced4da;
+    transition: var(--transition);
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.form-label {
+    font-weight: 500;
+    color: var(--dark-color);
+    margin-bottom: 0.5rem;
+}
+
+/* 按钮样式 */
+.btn {
+    border-radius: var(--border-radius);
+    font-weight: 500;
+    transition: var(--transition);
+    padding: 0.5rem 1rem;
+}
+
+/* 文档来源选择样式 */
+.btn-group .btn-outline-primary {
+    border-color: #dee2e6;
+    color: var(--secondary-color);
+}
+
+.btn-group .btn-outline-primary:hover {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.btn-group .btn-check:checked + .btn-outline-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+/* 已保存文档区域样式 */
+#saved-document-section {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    margin-top: 0.5rem;
+}
+
+#saved-document-section .form-label {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+/* 上传新文档区域样式 */
+#upload-document-section {
+    background-color: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    margin-top: 0.5rem;
+}
+
+#upload-document-section .form-label {
+    color: var(--success-color);
+    font-weight: 600;
+}
+
+/* 用户文档列表样式 */
+#user-documents-list .form-check {
+    background-color: white;
+    border: 1px solid #e9ecef;
+    border-radius: var(--border-radius);
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    transition: var(--transition);
+}
+
+#user-documents-list .form-check:hover {
+    background-color: #f8f9fa;
+    border-color: var(--primary-color);
+}
+
+#user-documents-list .form-check-input:checked + .form-check-label {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+#user-documents-list .form-check-label {
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 0;
+}
+
+#user-documents-list .form-check-label i {
+    margin-right: 0.5rem;
+    color: var(--info-color);
+}
+
+/* 文档预览区域样式 */
+#document-preview .card {
+    border: 2px solid #e9ecef;
+}
+
+#document-preview .card-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    color: white;
+    border-bottom: none;
+}
+
+#document-preview .card-header h6 {
+    color: white;
+    margin: 0;
+}
+
+#document-preview .btn-outline-danger {
+    color: white;
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* 文档内容显示样式 */
+.document-content {
+    font-family: 'Times New Roman', Times, serif !important;
+    font-size: 12pt !important;
+    line-height: 1.5 !important;
+    color: #000 !important;
+    background-color: #fff !important;
+    padding: 20px !important;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+.document-content p {
+    margin: 6pt 0 !important;
+    padding: 0 !important;
+    line-height: 1.5 !important;
+}
+
+.document-content h1,
+.document-content h2,
+.document-content h3,
+.document-content h4,
+.document-content h5,
+.document-content h6 {
+    font-weight: bold !important;
+    margin: 12pt 0 6pt 0 !important;
+    line-height: 1.3 !important;
+}
+
+.document-content table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    margin: 15px 0 !important;
+    font-size: 12pt !important;
+}
+
+.document-content table td,
+.document-content table th {
+    border: 1px solid #000 !important;
+    padding: 8px !important;
+    vertical-align: top !important;
+    font-size: 12pt !important;
+}
+
+.document-content table th {
+    background-color: #f0f0f0 !important;
+    font-weight: bold !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+.document-content span {
+    font-family: inherit !important;
+}
+
+/* 邮件预览中的文档内容样式 */
+#doc-document-content .document-content {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+}
+
+#doc-email-preview .document-content {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+}
+
+#document-preview .btn-outline-danger:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: white;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-success {
+    background-color: var(--success-color);
+    border-color: var(--success-color);
+}
+
+.btn-danger {
+    background-color: var(--danger-color);
+    border-color: var(--danger-color);
+}
+
+.btn-warning {
+    background-color: var(--warning-color);
+    border-color: var(--warning-color);
+    color: var(--dark-color);
+}
+
+/* 标签页内容 */
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 教授卡片样式 */
+.professor-card {
+    border: 1px solid #dee2e6;
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background-color: #fff;
+    transition: var(--transition);
+}
+
+.professor-card:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 0.25rem 0.5rem rgba(13, 110, 253, 0.15);
+}
+
+.professor-name {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.professor-university {
+    color: var(--secondary-color);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.professor-research {
+    font-size: 0.85rem;
+    color: var(--dark-color);
+    margin-bottom: 0.75rem;
+}
+
+.professor-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* 邮件内容样式 */
+.email-content {
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    white-space: pre-wrap;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    min-height: 300px;
+}
+
+.email-subject {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* 记录表格样式 */
+.record-item {
+    border: 1px solid #dee2e6;
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background-color: #fff;
+    transition: var(--transition);
+}
+
+.record-item:hover {
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+}
+
+.record-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.record-professor {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.record-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status-sent {
+    background-color: var(--success-color);
+    color: #fff;
+}
+
+.status-failed {
+    background-color: var(--danger-color);
+    color: #fff;
+}
+
+.status-pending {
+    background-color: var(--warning-color);
+    color: var(--dark-color);
+}
+
+.record-time {
+    font-size: 0.85rem;
+    color: var(--secondary-color);
+}
+
+.record-subject {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+/* 加载动画 */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(13, 110, 253, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* 空状态样式 */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--secondary-color);
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state p {
+    font-size: 1.1rem;
+    margin-bottom: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 1rem;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .professor-actions {
+        justify-content: center;
+    }
+    
+    .btn {
+        font-size: 0.875rem;
+        padding: 0.375rem 0.75rem;
+    }
+    
+    .record-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+
+/* 工具提示样式 */
+.tooltip {
+    font-size: 0.875rem;
+}
+
+/* 模态框样式 */
+.modal-content {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+}
+
+.modal-header {
+    border-bottom: 1px solid #dee2e6;
+    padding: 1.5rem;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    border-top: 1px solid #dee2e6;
+    padding: 1.5rem;
+}
+
+/* Toast 通知样式 */
+.toast {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.toast-header {
+    background-color: var(--light-color);
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* 文本选择样式 */
+::selection {
+    background-color: rgba(13, 110, 253, 0.2);
+    color: var(--dark-color);
+}
+
+/* 焦点样式 */
+.btn:focus,
+.form-control:focus,
+.form-select:focus {
+    outline: none;
+}
+
+/* 禁用状态样式 */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn:disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* 成功/错误消息样式 */
+.alert {
+    border: none;
+    border-radius: var(--border-radius);
+    font-weight: 500;
+}
+
+.alert-success {
+    background-color: rgba(25, 135, 84, 0.1);
+    color: var(--success-color);
+    border-left: 4px solid var(--success-color);
+}
+
+.alert-danger {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: var(--danger-color);
+    border-left: 4px solid var(--danger-color);
+}
+
+.alert-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: #856404;
+    border-left: 4px solid var(--warning-color);
+}
+
+.alert-info {
+    background-color: rgba(13, 202, 240, 0.1);
+    color: #055160;
+    border-left: 4px solid var(--info-color);
+}
+
+/* 邮件发送页面样式 */
+.sending-mode-selection {
+    margin-bottom: 2rem;
+}
+
+.mode-card {
+    cursor: pointer;
+    transition: var(--transition);
+    border: 2px solid transparent;
+}
+
+.mode-card:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+.mode-card.selected {
+    border-color: var(--success-color);
+    background-color: rgba(25, 135, 84, 0.05);
+}
+
+.mode-card.selected.document-mode {
+    border-color: var(--info-color);
+    background-color: rgba(13, 202, 240, 0.05);
+}
+
+.sending-interface {
+    display: none;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.sending-interface.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.document-preview {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    background-color: #f8f9fa;
+}
+
+.email-preview {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    background-color: #fff;
+}
+
+.generation-params {
+    background-color: #f8f9fa;
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.user-selection {
+    margin-bottom: 1.5rem;
+}
+
+.professor-selection {
+    margin-bottom: 1.5rem;
+}
+
+.batch-professors-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* 教授选择容器样式 */
+.professor-selection-container {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: var(--border-radius);
+    background-color: #fff;
+}
+
+.professor-selection-container:hover {
+    background-color: #f8f9fa;
+}
+
+/* 教授复选框样式 - 防止hover时状态变化 */
+.professor-checkbox {
+    cursor: pointer;
+}
+
+.professor-checkbox:hover {
+    /* 保持原有状态，不改变外观 */
+    opacity: 1;
+}
+
+/* 确保已选中的复选框在hover时保持选中状态 */
+.professor-checkbox:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.professor-checkbox:checked:hover {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    opacity: 1;
+}
+
+.selected-count {
+    font-weight: 600;
+    color: var(--primary-color);
+}

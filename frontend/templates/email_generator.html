@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+
+{% block title %}邮件发送 - 自动套磁邮件系统{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <!-- 发送方式选择 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="bi bi-send"></i> 邮件发送方式选择</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card h-100 border-success" id="ai-generation-card" onclick="selectSendingMode('ai')" style="cursor: pointer;">
+                            <div class="card-body text-center">
+                                <i class="bi bi-magic display-4 text-success mb-3"></i>
+                                <h5 class="card-title">AI生成套磁信</h5>
+                                <p class="card-text">使用AI根据教授信息和您的背景自动生成个性化套磁信</p>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="sending-mode" id="ai-mode" value="ai">
+                                    <label class="form-check-label" for="ai-mode">
+                                        选择此方式
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100 border-info" id="document-usage-card" onclick="selectSendingMode('document')" style="cursor: pointer;">
+                            <div class="card-body text-center">
+                                <i class="bi bi-file-text display-4 text-info mb-3"></i>
+                                <h5 class="card-title">使用已上传套磁信</h5>
+                                <p class="card-text">直接使用用户已经上传的套磁信文档发送邮件</p>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="sending-mode" id="document-mode" value="document">
+                                    <label class="form-check-label" for="document-mode">
+                                        选择此方式
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- AI生成套磁信界面 -->
+        <div id="ai-generation-interface" class="row" style="display: none;">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-magic"></i> AI生成套磁信</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="ai-email-form">
+                            <!-- 选择发送用户 -->
+                            <div class="mb-4">
+                                <h6 class="text-primary"><i class="bi bi-1-circle"></i> 选择发送用户</h6>
+                                <div class="mb-3">
+                                    <label for="ai-sender-user" class="form-label">发送人 *</label>
+                                    <select class="form-select" id="ai-sender-user" onchange="handleAISenderChange()">
+                                        <option value="">请选择发送用户</option>
+                                    </select>
+                                    <div class="form-text">选择在用户管理中创建的用户作为邮件发送人</div>
+                                </div>
+                            </div>
+                            
+                            <!-- 选择收件人教授 -->
+                            <div class="mb-4" id="ai-professor-selection" style="display: none;">
+                                <h6 class="text-primary"><i class="bi bi-2-circle"></i> 选择收件人教授</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">发送模式 *</label>
+                                    <div class="btn-group w-100" role="group">
+                                        <input type="radio" class="btn-check" name="ai-selection-mode" id="ai-single-mode" value="single" checked onchange="handleAISelectionModeChange(event)">
+                                        <label class="btn btn-outline-primary" for="ai-single-mode">
+                                            <i class="bi bi-person"></i> 单个发送
+                                        </label>
+                                        <input type="radio" class="btn-check" name="ai-selection-mode" id="ai-batch-mode" value="batch" onchange="handleAISelectionModeChange(event)">
+                                        <label class="btn btn-outline-primary" for="ai-batch-mode">
+                                            <i class="bi bi-people"></i> 批量发送
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <!-- 单个选择 -->
+                                <div id="ai-single-selection" class="mb-3">
+                                    <label for="ai-select-professor" class="form-label">选择教授 *</label>
+                                    <select class="form-select" id="ai-select-professor">
+                                        <option value="">请选择教授</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- 批量选择 -->
+                <div id="ai-batch-selection" class="mb-3" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="ai-select-university" class="form-label">选择学校 *</label>
+                            <select class="form-select" id="ai-select-university">
+                                <option value="">请选择学校</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="ai-select-department" class="form-label">选择学院 *</label>
+                            <select class="form-select" id="ai-select-department" disabled>
+                                <option value="">请先选择学校</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="ai-batch-professors-list" class="mt-3" style="display: none;">
+                        <!-- 教授列表将在这里动态生成 -->
+                    </div>
+                </div>
+                            </div>
+                            
+                            <!-- AI生成参数 -->
+                            <div class="mb-4" id="ai-generation-params" style="display: none;">
+                                <h6 class="text-primary"><i class="bi bi-3-circle"></i> 生成参数</h6>
+                                <div class="mb-3">
+                                    <label for="ai-self-introduction" class="form-label">自我介绍 *</label>
+                                    <textarea class="form-control" id="ai-self-introduction" rows="6" 
+                                              placeholder="请输入您的学术背景、研究兴趣、相关经历等信息..." required></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="ai-additional-requirements" class="form-label">额外要求</label>
+                                    <textarea class="form-control" id="ai-additional-requirements" rows="3" 
+                                              placeholder="如：强调某个特定研究方向、提及特定论文等..."></textarea>
+                                </div>
+                            </div>
+                            
+                            <!-- 邮件主题设置 -->
+                            <div class="mb-4" id="ai-subject-setting" style="display: none;">
+                                <h6 class="text-primary"><i class="bi bi-4-circle"></i> 邮件主题设置</h6>
+                                <div id="ai-subject-container" class="mb-3">
+                                    <label for="ai-email-subject" class="form-label">邮件主题 *</label>
+                                    <input type="text" class="form-control" id="ai-email-subject" 
+                                           placeholder="请输入邮件主题，如：关于学术合作的咨询" required>
+                                    <div class="form-text">建议包含您的姓名或研究方向，让教授更容易识别</div>
+                                </div>
+                            </div>
+                            
+                            <div id="ai-actions-container" style="display: none;">
+                                <button type="submit" class="btn btn-success w-100" id="ai-generate-email-btn">
+                                    <i class="bi bi-magic"></i> 生成邮件
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="bi bi-envelope"></i> 生成的邮件</h5>
+                        <div>
+                            <button class="btn btn-outline-secondary btn-sm" id="ai-optimize-email-btn" style="display: none;">
+                                <i class="bi bi-arrow-up-circle"></i> 优化
+                            </button>
+                            <button class="btn btn-primary btn-sm" id="ai-send-email-btn" style="display: none;">
+                                <i class="bi bi-send"></i> 发送
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="ai-generated-email-content">
+                            <div class="text-muted text-center py-5">
+                                <i class="bi bi-envelope-open display-4"></i>
+                                <p class="mt-3">生成的邮件内容将显示在这里</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 使用已上传文档界面 -->
+        <div id="document-usage-interface" class="row" style="display: none;">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-file-text"></i> 使用已上传套磁信</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="document-email-form">
+                            <!-- 选择发送用户 -->
+                            <div class="mb-4">
+                                <h6 class="text-primary"><i class="bi bi-1-circle"></i> 选择发送用户</h6>
+                                <div class="mb-3">
+                                    <label for="doc-sender-user" class="form-label">发送人 *</label>
+                                    <select class="form-select" id="doc-sender-user" onchange="handleDocSenderChange()">
+                                        <option value="">请选择发送用户</option>
+                                    </select>
+                                    <div class="form-text">选择在用户管理中创建的用户作为邮件发送人</div>
+                                </div>
+                            </div>
+                            
+                            <!-- 选择套磁信文档 -->
+                            <div class="mb-4" id="doc-document-selection" style="display: none;">
+                                <h6 class="text-primary"><i class="bi bi-2-circle"></i> 选择套磁信文档</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">选择文档 *</label>
+                                    <div id="doc-user-documents-list"></div>
+                                    <div class="form-text">选择当前发送用户已上传的套磁信文档</div>
+                                </div>
+                                
+                                <!-- 文档预览 -->
+                                <div id="doc-document-preview" class="mt-3" style="display: none;">
+                                    <div class="card">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0">文档预览</h6>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearDocumentPreview()">
+                                                <i class="bi bi-x"></i> 清除
+                                            </button>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="doc-document-content" style="max-height: 300px; overflow-y: auto;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 选择收件人教授 -->
+                            <div class="mb-4" id="doc-professor-selection" style="display: none;">
+                                <h6 class="text-primary"><i class="bi bi-3-circle"></i> 选择收件人教授</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">发送模式 *</label>
+                                    <div class="btn-group w-100" role="group">
+                                        <input type="radio" class="btn-check" name="doc-selection-mode" id="doc-single-mode" value="single" checked onchange="handleDocSelectionModeChange(event)">
+                                        <label class="btn btn-outline-primary" for="doc-single-mode">
+                                            <i class="bi bi-person"></i> 单个发送
+                                        </label>
+                                        <input type="radio" class="btn-check" name="doc-selection-mode" id="doc-batch-mode" value="batch" onchange="handleDocSelectionModeChange(event)">
+                                        <label class="btn btn-outline-primary" for="doc-batch-mode">
+                                            <i class="bi bi-people"></i> 批量发送
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <!-- 单个选择 -->
+                                <div id="doc-single-selection" class="mb-3">
+                                    <label for="doc-select-professor" class="form-label">选择教授 *</label>
+                                    <select class="form-select" id="doc-select-professor">
+                                        <option value="">请选择教授</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- 批量选择 -->
+                                <div id="doc-batch-selection" class="mb-3" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label for="doc-select-university" class="form-label">选择学校 *</label>
+                                            <select class="form-select" id="doc-select-university">
+                                                <option value="">请选择学校</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="doc-select-department" class="form-label">选择学院 *</label>
+                                            <select class="form-select" id="doc-select-department" disabled>
+                                                <option value="">请先选择学校</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="doc-batch-professors-list" class="mt-3" style="display: none;">
+                                        <!-- 教授列表将在这里动态生成 -->
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 邮件主题设置 -->
+            <div class="mb-4" id="doc-subject-setting" style="display: none;">
+                <h6 class="text-primary"><i class="bi bi-4-circle"></i> 邮件主题设置</h6>
+                <div id="doc-subject-container" class="mb-3">
+                    <label for="doc-email-subject" class="form-label">邮件主题 *</label>
+                    <input type="text" class="form-control" id="doc-email-subject" 
+                           placeholder="请输入邮件主题，如：关于学术合作的咨询" required>
+                    <div class="form-text">建议包含您的姓名或研究方向，让教授更容易识别</div>
+                </div>
+                
+                <!-- 关键词替换说明 -->
+                <div class="mb-3">
+                    <h6 class="text-info"><i class="bi bi-info-circle"></i> 关键词替换说明</h6>
+                    <div class="alert alert-info">
+                        <p class="mb-2"><strong>在邮件主题和内容中，您可以使用以下关键词，系统会自动替换：</strong></p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul class="list-unstyled mb-0">
+                                    <li><code>{{ '{{name}}' }}</code> → 教授姓名</li>
+                                    <li><code>{{ '{{date}}' }}</code> → 当前日期</li>
+                                    <li><code>{{ '{{university}}' }}</code> → 学校名称</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul class="list-unstyled mb-0">
+                                    <li><code>{{ '{{department}}' }}</code> → 学院名称</li>
+                                    <li><code>{{ '{{research_direction}}' }}</code> → 研究方向</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="bi bi-lightbulb"></i> 
+                                示例："Dear {{ '{{name}}' }}, 关于{{ '{{research_direction}}' }}的学术合作咨询 - {{ '{{date}}' }}"
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                            
+                            <div class="d-grid gap-2" id="doc-actions-container" style="display: none;">
+                                <button type="button" class="btn btn-success" id="doc-generate-email-btn" onclick="generateDocumentEmail()">
+                                    <i class="bi bi-magic"></i> 生成邮件预览
+                                </button>
+                                <button type="submit" class="btn btn-primary" id="doc-send-email-btn">
+                                    <i class="bi bi-send"></i> 发送邮件
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-envelope"></i> 邮件预览</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="doc-email-preview">
+                            <div class="text-muted text-center py-5">
+                                <i class="bi bi-envelope-open display-4"></i>
+                                <p class="mt-3">选择文档后邮件预览将显示在这里</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

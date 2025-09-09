@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}发送记录 - 自动套磁邮件系统{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-clock-history"></i> 邮件发送记录</h5>
+                <button class="btn btn-outline-primary btn-sm" onclick="loadEmailRecords()">
+                    <i class="bi bi-arrow-clockwise"></i> 刷新
+                </button>
+            </div>
+            <div class="card-body">
+                <!-- 筛选区域 -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label for="filter-sender" class="form-label">发送人</label>
+                        <input type="text" class="form-control" id="filter-sender" placeholder="搜索发送人..." onkeyup="filterEmailRecords()">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filter-university" class="form-label">学校</label>
+                        <select class="form-select" id="filter-university" onchange="filterEmailRecords()">
+                            <option value="">所有学校</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filter-professor" class="form-label">教授</label>
+                        <input type="text" class="form-control" id="filter-professor" placeholder="搜索教授姓名..." onkeyup="filterEmailRecords()">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filter-status" class="form-label">状态</label>
+                        <select class="form-select" id="filter-status" onchange="filterEmailRecords()">
+                            <option value="">所有状态</option>
+                            <option value="sent">已发送</option>
+                            <option value="failed">发送失败</option>
+                            <option value="pending">待发送</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="filter-date-from" class="form-label">开始日期</label>
+                        <input type="date" class="form-control" id="filter-date-from" onchange="filterEmailRecords()">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="filter-date-to" class="form-label">结束日期</label>
+                        <input type="date" class="form-control" id="filter-date-to" onchange="filterEmailRecords()">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="filter-content" class="form-label">内容关键词</label>
+                        <input type="text" class="form-control" id="filter-content" placeholder="搜索邮件内容..." onkeyup="filterEmailRecords()">
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="clearEmailFilters()">
+                            <i class="bi bi-x-circle"></i> 清除筛选
+                        </button>
+                        <span class="ms-3 text-muted" id="records-count">共 0 条记录</span>
+                    </div>
+                </div>
+                
+                <div id="email-records-list">
+                    <!-- 邮件记录将在这里动态加载 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 邮件详情模态框 -->
+    <div class="modal fade" id="emailDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-envelope-open"></i> 邮件详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="email-detail-content">
+                        <!-- 邮件详情内容将在这里显示 -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary" id="resend-email-btn" style="display: none;">
+                        <i class="bi bi-arrow-clockwise"></i> 重新发送
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

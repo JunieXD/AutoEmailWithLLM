@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}用户管理 - 自动套磁邮件系统{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="page-content">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="bi bi-people-fill"></i> 用户管理</h5>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal">
+                            <i class="bi bi-plus-circle"></i> 添加用户
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <!-- 用户列表 -->
+                        <div id="userList" class="row">
+                            <!-- 用户卡片将在这里动态生成 -->
+                        </div>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 用户模态框 -->
+    <div class="modal fade" id="userModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="userModalTitle">添加用户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="userForm" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="userName" class="form-label">姓名 *</label>
+                                    <input type="text" class="form-control" id="userName" name="name" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="userEmail" class="form-label">邮箱 *</label>
+                                    <input type="email" class="form-control" id="userEmail" name="email" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="emailPassword" class="form-label">邮箱授权码 *</label>
+                                    <input type="password" class="form-control" id="emailPassword" name="email_password" required>
+                                    <div class="form-text">用于SMTP发送邮件的授权码</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="smtpServer" class="form-label">SMTP服务器</label>
+                                    <input type="text" class="form-control" id="smtpServer" name="smtp_server" placeholder="如：smtp.gmail.com">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="smtpPort" class="form-label">SMTP端口</label>
+                                    <input type="number" class="form-control" id="smtpPort" name="smtp_port" placeholder="587" min="1" max="65535">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="description" class="form-label">描述</label>
+                            <textarea class="form-control" id="description" name="description" rows="2" placeholder="用户描述信息"></textarea>
+                        </div>
+                        
+                        <!-- 文件上传区域 -->
+                        <div class="mb-4">
+                            <h6 class="text-primary mb-3"><i class="bi bi-files"></i> 文件管理</h6>
+                            
+                            <!-- 文件上传按钮组 -->
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <button type="button" class="btn btn-outline-primary w-100" onclick="addFileUpload('cover_letter')">
+                                        <i class="bi bi-file-earmark-text"></i> 添加套磁信
+                                    </button>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="button" class="btn btn-outline-success w-100" onclick="addFileUpload('resume')">
+                                        <i class="bi bi-file-earmark-person"></i> 添加简历
+                                    </button>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="button" class="btn btn-outline-info w-100" onclick="addFileUpload('transcript')">
+                                        <i class="bi bi-file-earmark-bar-graph"></i> 添加成绩单
+                                    </button>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="button" class="btn btn-outline-secondary w-100" onclick="addFileUpload('other')">
+                                        <i class="bi bi-file-earmark"></i> 其他文件
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- 文件列表容器 -->
+                            <div id="filesList" class="border rounded p-3" style="min-height: 100px; background-color: #f8f9fa;">
+                                <div id="noFilesMessage" class="text-center text-muted py-3">
+                                    <i class="bi bi-inbox fs-1"></i>
+                                    <p class="mt-2 mb-0">暂无文件，点击上方按钮添加文件</p>
+                                </div>
+                            </div>
+                            
+                            <!-- 隐藏的文件输入框 -->
+                            <input type="file" class="d-none" id="hiddenFileInput" multiple accept=".docx,.pdf,.doc,.txt,.jpg,.jpeg,.png">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="submit" class="btn btn-primary" id="saveUserBtn">
+                            <span class="spinner-border spinner-border-sm me-1" style="display: none;"></span>
+                            保存
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认删除模态框 -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">确认删除</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>确定要删除用户 <strong id="deleteUserName"></strong> 吗？</p>
+                    <p class="text-danger">此操作不可撤销，将同时删除用户的所有文件。</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="{{ url_for('static', filename='js/user_management.js') }}"></script>
+{% endblock %}

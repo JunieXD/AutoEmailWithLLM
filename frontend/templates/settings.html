@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}设置 - 自动套磁邮件系统{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-envelope-gear"></i> 邮件发送设置</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="email-settings-form">
+                            <div class="mb-3">
+                                <label for="sender-name" class="form-label">发件人姓名 *</label>
+                                <input type="text" class="form-control" id="sender-name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="sender-email" class="form-label">发件人邮箱 *</label>
+                                <input type="email" class="form-control" id="sender-email" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="sender-password" class="form-label">邮箱授权码 *</label>
+                                <input type="password" class="form-control" id="sender-password" required>
+                                <div class="form-text">请使用邮箱的授权码，不是登录密码</div>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary" id="test-email-config">
+                                <i class="bi bi-check-circle"></i> 测试配置
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> 保存设置
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-robot"></i> LLM设置</h5>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div></div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="manage-configs-btn">
+                                <i class="bi bi-gear"></i> 管理配置
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- 配置选择区域 -->
+                        <div class="mb-3" id="config-selection-area" style="display: none;">
+                            <label for="saved-configs" class="form-label">已保存的配置</label>
+                            <div class="d-flex gap-2">
+                                <select class="form-select" id="saved-configs">
+                                    <option value="">选择配置...</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-primary" id="load-config-btn">
+                                    <i class="bi bi-download"></i> 加载
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" id="delete-config-btn">
+                                    <i class="bi bi-trash"></i> 删除
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <form id="llm-settings-form">
+                            <div class="mb-3">
+                                <label for="config-name" class="form-label">配置名称</label>
+                                <input type="text" class="form-control" id="config-name" 
+                                       placeholder="为此配置起个名字...">
+                            </div>
+                            <div class="mb-3">
+                                <label for="llm-provider" class="form-label">API提供商</label>
+                                <select class="form-select" id="llm-provider" onchange="handleProviderChange()">
+                                    <option value="openai">OpenAI</option>
+                                    <option value="volcengine">火山方舟</option>
+                                    <option value="custom">自定义</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="llm-api-key" class="form-label">API Key *</label>
+                                <input type="password" class="form-control" id="llm-api-key" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="llm-api-base" class="form-label">API Base URL</label>
+                                <input type="url" class="form-control" id="llm-api-base" 
+                                       placeholder="https://api.openai.com/v1">
+                            </div>
+                            <div class="mb-3">
+                                <label for="llm-model" class="form-label">模型</label>
+                                <input type="text" class="form-control" id="llm-model" 
+                                       placeholder="请输入模型名称，如：gpt-3.5-turbo, gpt-4, doubao-pro-4k等">
+                                <div class="form-text">
+                                    OpenAI：gpt-3.5-turbo, gpt-4, gpt-4-turbo等<br>
+                                    火山方舟：推理接入点ID（如：ep-xxxxxxxx）或模型名称（如：doubao-pro-4k）
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="set-as-default">
+                                    <label class="form-check-label" for="set-as-default">
+                                        设为默认配置
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-primary" id="test-llm-config">
+                                    <i class="bi bi-check-circle"></i> 测试连接
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save"></i> 保存配置
+                                </button>
+                                <button type="button" class="btn btn-success" id="use-current-config">
+                                    <i class="bi bi-play"></i> 使用当前配置
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LLM配置测试结果模态框 -->
+    <div class="modal fade" id="llmTestModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-check-circle"></i> LLM连接测试</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="llm-test-result">
+                        <!-- 测试结果将在这里显示 -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 邮件配置测试结果模态框 -->
+    <div class="modal fade" id="emailTestModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-envelope-check"></i> 邮件配置测试</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="email-test-result">
+                        <!-- 测试结果将在这里显示 -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
