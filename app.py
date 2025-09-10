@@ -6,7 +6,6 @@ import logging
 
 # 导入自定义模块
 from backend.email_service import EmailService
-from backend.llm_service import LLMService
 from backend.database import db, Professor, EmailRecord
 from backend.config import Config
 from backend.import_service import ImportService
@@ -48,7 +47,6 @@ def create_app():
     
     # 初始化服务
     email_service = EmailService()
-    llm_service = LLMService()
     import_service = ImportService()
     user_service = UserService()
     
@@ -156,109 +154,7 @@ def create_app():
             db.session.commit()
             return jsonify({'message': '教授信息删除成功'})
     
-    @app.route('/api/generate-email', methods=['POST'])
-    def generate_email():
-        """生成个性化套磁信"""
-        try:
-            data = request.get_json()
-            
-            # 支持新的AI表单格式
-            professor_ids = data.get('professor_ids', [])
-            professor_id = data.get('professor_id')
-            sender_user_id = data.get('sender_user_id')
-            
-            # 兼容旧格式：如果没有professor_ids但有professor_id，转换为列表
-            if not professor_ids and professor_id:
-                professor_ids = [professor_id]
-            elif not professor_ids:
-                return jsonify({'error': '请选择至少一个教授'}), 400
-            
-            # 目前只处理第一个教授（后续可扩展为批量处理）
-            target_professor_id = professor_ids[0]
-            
-            self_introduction_doc_id = data.get('self_introduction_doc_id')
-            self_introduction = data.get('self_introduction', '')  # 兼容旧版本
-            llm_config = data.get('llm_config', {})
-            custom_subject = data.get('custom_subject', '')
-            additional_requirements = data.get('additional_requirements', '')
-            
-            professor = db.session.get(Professor, target_professor_id)
-            if not professor:
-                return jsonify({'error': '教授信息不存在'}), 404
-            
-            # 检查教授是否有研究方向信息
-            if not professor.research_area or professor.research_area.strip() == '':
-                return jsonify({'error': '该教授缺少研究方向信息，无法生成个性化邮件'}), 400
-            
-            # 获取自荐信内容
-            if self_introduction_doc_id:
-                # 从文档获取自荐信内容
-                content, error = document_service.get_file_content(self_introduction_doc_id, 'text')
-                if error:
-                    return jsonify({'error': f'获取自荐信内容失败: {error}'}), 400
-                self_introduction = content
-            elif not self_introduction:
-                return jsonify({'error': '请提供自荐信内容或选择自荐信文档'}), 400
-            
-            # 获取LLM提示词配置
-            from backend.database import LLMPromptConfig
-            prompt_config = LLMPromptConfig.query.filter_by(is_default=True).first()
-            
-            # 创建LLM服务实例（使用前端配置）
-            generate_llm_service = LLMService(
-                api_key=llm_config.get('apiKey'),
-                api_base=llm_config.get('apiBase'),
-                model=llm_config.get('model'),
-                provider=llm_config.get('provider', 'openai')
-            )
-            
-            # 使用LLM生成个性化邮件内容（纯文本格式）
-            email_content = generate_llm_service.generate_email(
-                professor_info={
-                    'name': professor.name,
-                    'university': professor.university,
-                    'department': professor.department,
-                    'research_area': professor.research_area,
-                    'introduction': professor.introduction
-                },
-                self_introduction=self_introduction,
-                additional_requirements=additional_requirements,
-                prompt_config=prompt_config,
-                format_type='text'  # 指定生成纯文本格式
-            )
-            
-            # 获取发送用户信息（用于邮件主题）
-            applicant_name = '申请者'  # 默认值
-            if sender_user_id:
-                from backend.models.user_profile import UserProfile
-                sender_user = UserProfile.query.filter_by(id=sender_user_id, is_active=True).first()
-                if sender_user:
-                    applicant_name = sender_user.name or sender_user.email.split('@')[0]
-            
-            # 生成邮件主题
-            if custom_subject:
-                email_subject = custom_subject
-            else:
-                # 使用LLM生成默认主题
-                email_subject = generate_llm_service.generate_subject(
-                    professor_info={
-                        'name': professor.name,
-                        'university': professor.university,
-                        'research_area': professor.research_area
-                    },
-                    applicant_name=applicant_name
-                )
-            
-            return jsonify({
-                'subject': email_subject,
-                'content': email_content,
-                'professor_name': professor.name,
-                'format': 'text'  # 标识返回的是纯文本格式
-            })
-            
-        except Exception as e:
-            logger.error(f"生成邮件内容失败: {e}")
-            return jsonify({'error': str(e)}), 500
+    # AI生成邮件功能已移除，仅保留文档邮件发送功能
     
     @app.route('/api/send-email', methods=['POST'])
     def send_email():
@@ -364,6 +260,7 @@ def create_app():
             school = data.get('school', '')
             college = data.get('college', '')
             custom_subject = data.get('custom_subject', '')
+            batch_mode = data.get('batch_mode', False)
             
             if not sender_id:
                 return jsonify({'success': False, 'message': '请选择发送人'}), 400
@@ -372,7 +269,7 @@ def create_app():
                 return jsonify({'success': False, 'message': '请选择至少一个文档'}), 400
                 
             if not selected_professors:
-                return jsonify({'success': False, 'message': '请选择至少一个教授'}), 400
+                return jsonify({'success': False, 'message': '请选择至少一个教授或学院'}), 400
             
             # 获取发送人信息
             sender = UserProfile.query.filter_by(id=sender_id, is_active=True).first()
@@ -393,15 +290,29 @@ def create_app():
             
             # 获取教授信息
             professors = []
-            for prof_id in selected_professors:
-                professor = Professor.query.get(prof_id)
-                if professor:
-                    professors.append({
-                        'name': professor.name,
-                        'university': professor.university,
-                        'department': professor.department,
-                        'research_area': professor.research_area
-                    })
+            if batch_mode:
+                # 批量模式：根据学院查询所有教授
+                for dept_id in selected_professors:
+                    # 这里假设传递的是学院名称，需要根据学院查询教授
+                    dept_professors = Professor.query.filter_by(department=dept_id).all()
+                    for professor in dept_professors:
+                        professors.append({
+                            'name': professor.name,
+                            'university': professor.university,
+                            'department': professor.department,
+                            'research_area': professor.research_area
+                        })
+            else:
+                # 单个模式：根据教授ID查询
+                for prof_id in selected_professors:
+                    professor = Professor.query.get(prof_id)
+                    if professor:
+                        professors.append({
+                            'name': professor.name,
+                            'university': professor.university,
+                            'department': professor.department,
+                            'research_area': professor.research_area
+                        })
             
             # 检查是否有模板内容
             if not template_content:
@@ -466,123 +377,7 @@ def create_app():
             logger.error(f"生成文档邮件预览失败: {e}")
             return jsonify({'success': False, 'message': str(e)}), 500
     
-    @app.route('/api/send-batch-emails', methods=['POST'])
-    def send_batch_emails():
-        """批量发送邮件"""
-        try:
-            data = request.get_json()
-            professor_ids = data['professor_ids']
-            self_introduction = data['self_introduction']
-            sender_config = data['sender_config']
-            llm_config = data.get('llm_config', {})
-            
-            # 创建LLM服务实例（使用前端配置）
-            batch_llm_service = LLMService(
-                api_key=llm_config.get('apiKey'),
-                api_base=llm_config.get('apiBase'),
-                model=llm_config.get('model'),
-                provider=llm_config.get('provider', 'openai')
-            )
-            
-            success_count = 0
-            failed_count = 0
-            failed_emails = []
-            
-            for professor_id in professor_ids:
-                try:
-                    # 获取教授信息
-                    professor = db.session.get(Professor, professor_id)
-                    if not professor:
-                        failed_count += 1
-                        failed_emails.append({
-                            'professor_id': professor_id,
-                            'professor_name': f'ID:{professor_id}',
-                            'email': 'unknown',
-                            'error': '教授信息不存在'
-                        })
-                        continue
-                    
-                    # 使用LLM生成个性化邮件内容
-                    email_content = batch_llm_service.generate_email(
-                        professor_info={
-                            'name': professor.name,
-                            'university': professor.university,
-                            'department': professor.department,
-                            'research_area': professor.research_area,
-                            'introduction': professor.introduction
-                        },
-                        self_introduction=self_introduction
-                    )
-                    
-                    if not email_content:
-                        failed_count += 1
-                        failed_emails.append({
-                            'professor_id': professor.id,
-                            'professor_name': professor.name,
-                            'email': professor.email,
-                            'error': '邮件内容生成失败'
-                        })
-                        continue
-                    
-                    # 发送邮件
-                    subject = f'Academic Collaboration Inquiry - {professor.research_area}'
-                    success = email_service.send_email(
-                        recipient_email=professor.email,
-                        recipient_name=professor.name,
-                        subject=subject,
-                        content=email_content,
-                        sender_config=sender_config
-                    )
-                    
-                    # 记录发送结果
-                    email_record = EmailRecord(
-                        professor_id=professor.id,
-                        subject=subject,
-                        content=email_content,
-                        status='sent' if success else 'failed',
-                        sender_name=sender_config['name'],
-                        sender_email=sender_config['email'],
-                        sent_at=datetime.now() if success else None
-                    )
-                    db.session.add(email_record)
-                    
-                    if success:
-                        success_count += 1
-                    else:
-                        failed_count += 1
-                        failed_emails.append({
-                            'professor_id': professor.id,
-                            'professor_name': professor.name,
-                            'email': professor.email,
-                            'error': '邮件发送失败'
-                        })
-                        
-                except Exception as e:
-                    failed_count += 1
-                    professor_name = professor.name if 'professor' in locals() and professor else f'ID:{professor_id}'
-                    professor_email = professor.email if 'professor' in locals() and professor else 'unknown'
-                    failed_emails.append({
-                        'professor_id': professor_id,
-                        'professor_name': professor_name,
-                        'email': professor_email,
-                        'error': str(e)
-                    })
-                    logger.error(f"批量发送邮件时出错 (教授ID: {professor_id}): {str(e)}")
-            
-            # 提交数据库更改
-            db.session.commit()
-            
-            return jsonify({
-                'success_count': success_count,
-                'failed_count': failed_count,
-                'failed_emails': failed_emails,
-                'message': f'批量发送完成: 成功 {success_count} 封, 失败 {failed_count} 封'
-            })
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"批量发送邮件时出错: {str(e)}")
-            return jsonify({'error': f'批量发送邮件时出错: {str(e)}'}), 500
+    # 批量发送邮件API已移除（AI功能已删除）
     
     @app.route('/api/email-records', methods=['GET'])
     def email_records():
@@ -1105,6 +900,7 @@ def create_app():
             documents = data.get('documents', [])
             subject = data.get('subject', '')
             send_interval = data.get('send_interval', 5)
+            attachment_ids = data.get('attachments', [])
             
             if not professors:
                 return jsonify({'error': '请选择至少一个教授'}), 400
@@ -1173,6 +969,15 @@ def create_app():
                         })
                         continue
                     
+                    # 处理附件
+                    attachments = []
+                    if attachment_ids:
+                        from backend.models.user_file import UserFile
+                        for file_id in attachment_ids:
+                            user_file = UserFile.query.filter_by(id=file_id, is_active=True).first()
+                            if user_file and os.path.exists(user_file.file_path):
+                                attachments.append(user_file.file_path)
+                    
                     # 发送邮件
                     sender_config = {
                         'email': default_user.email,
@@ -1186,7 +991,8 @@ def create_app():
                         subject=personalized_subject,
                         content=personalized_content,
                         sender_config=sender_config,
-                        content_type='html'
+                        content_type='html',
+                        attachments=attachments
                     )
                     
                     # 记录发送结果
@@ -1244,72 +1050,9 @@ def create_app():
             logger.error(f'批量发送文档邮件失败: {str(e)}')
             return jsonify({'error': f'发送失败: {str(e)}'}), 500
     
-    @app.route('/api/test-llm-config', methods=['POST'])
-    def test_llm_config():
-        """测试LLM配置"""
-        try:
-            data = request.get_json()
-            api_key = data.get('apiKey')
-            api_base = data.get('apiBase')
-            model = data.get('model')
-            provider = data.get('provider', 'openai')
-            
-            if not api_key:
-                return jsonify({'error': 'API Key不能为空'}), 400
-            
-            # 创建临时LLM服务实例进行测试
-            test_llm_service = LLMService(
-                api_key=api_key,
-                api_base=api_base,
-                model=model,
-                provider=provider
-            )
-            
-            # 测试连接
-            success = test_llm_service.check_api_status()
-            
-            if success:
-                return jsonify({'message': 'LLM配置测试成功'})
-            else:
-                return jsonify({'error': 'LLM配置测试失败'}), 400
-                
-        except Exception as e:
-            logger.error(f"LLM配置测试失败: {e}")
-            return jsonify({'error': str(e)}), 500
+    # LLM配置测试功能已移除
     
-    @app.route('/api/optimize-email', methods=['POST'])
-    def optimize_email():
-        """优化邮件内容"""
-        try:
-            data = request.get_json()
-            original_content = data.get('original_content')
-            optimization_request = data.get('optimization_request')
-            llm_config = data.get('llm_config', {})
-            
-            if not original_content or not optimization_request:
-                return jsonify({'error': '原始内容和优化要求不能为空'}), 400
-            
-            # 创建LLM服务实例（使用前端配置）
-            optimize_llm_service = LLMService(
-                api_key=llm_config.get('apiKey'),
-                api_base=llm_config.get('apiBase'),
-                model=llm_config.get('model'),
-                provider=llm_config.get('provider', 'openai')
-            )
-            
-            # 优化邮件内容
-            optimized_content = optimize_llm_service.optimize_email_content(
-                original_content=original_content,
-                optimization_request=optimization_request
-            )
-            
-            return jsonify({
-                'optimized_content': optimized_content
-            })
-            
-        except Exception as e:
-            logger.error(f"优化邮件内容失败: {e}")
-            return jsonify({'error': str(e)}), 500
+    # 邮件优化功能已移除
     
     # 设置相关API
     @app.route('/api/settings/upload', methods=['GET'])
@@ -1375,284 +1118,9 @@ def create_app():
             logger.error(f"获取数据库信息失败: {e}")
             return jsonify({'error': str(e)}), 500
 
-    # LLM配置管理API
-    @app.route('/api/llm-configs', methods=['GET'])
-    def get_llm_configs():
-        """获取所有LLM配置"""
-        try:
-            from backend.database import LLMConfig
-            configs = LLMConfig.query.order_by(LLMConfig.created_at.desc()).all()
-            return jsonify({
-                'configs': [config.to_dict() for config in configs]
-            })
-        except Exception as e:
-            logger.error(f"获取LLM配置失败: {e}")
-            return jsonify({'error': str(e)}), 500
+    # LLM配置管理API已移除
     
-    @app.route('/api/llm-configs/<int:config_id>', methods=['GET'])
-    def get_llm_config(config_id):
-        """获取单个LLM配置"""
-        try:
-            from backend.database import LLMConfig
-            config = LLMConfig.query.get_or_404(config_id)
-            return jsonify({
-                'success': True,
-                'config': config.to_dict(include_api_key=True)
-            })
-        except Exception as e:
-            logger.error(f"获取LLM配置失败: {e}")
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/llm-configs/<int:config_id>', methods=['DELETE'])
-    def delete_llm_config(config_id):
-        """删除LLM配置"""
-        try:
-            from backend.database import LLMConfig
-            config = LLMConfig.query.get_or_404(config_id)
-            
-            db.session.delete(config)
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': '配置删除成功'
-            })
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"删除LLM配置失败: {e}")
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/llm-configs', methods=['POST'])
-    def save_llm_config():
-        """保存LLM配置"""
-        try:
-            from backend.database import LLMConfig
-            from backend.config import Config
-            
-            data = request.get_json()
-            name = data.get('name')
-            provider = data.get('provider')
-            api_key = data.get('api_key')
-            api_base = data.get('base_url')
-            model = data.get('model')
-            is_default = data.get('is_default', False)
-            
-            if not name or not provider or not api_key or not model:
-                return jsonify({'error': '配置名称、提供商、API密钥和模型不能为空'}), 400
-            
-            # 检查配置名称是否已存在
-            existing_config = LLMConfig.query.filter_by(name=name).first()
-            if existing_config:
-                return jsonify({'error': '配置名称已存在'}), 400
-            
-            # 如果设置为默认配置，取消其他默认配置
-            if is_default:
-                LLMConfig.query.filter_by(is_default=True).update({'is_default': False})
-            
-            # 加密API密钥
-            encrypted_api_key = Config.encrypt_api_key(api_key)
-            
-            # 创建新配置
-            new_config = LLMConfig(
-                name=name,
-                provider=provider,
-                api_key_encrypted=encrypted_api_key,
-                api_base=api_base,
-                model=model,
-                is_default=is_default
-            )
-            
-            db.session.add(new_config)
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': '配置保存成功',
-                'config': new_config.to_dict()
-            })
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"保存LLM配置失败: {e}")
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/llm-configs/<int:config_id>/use', methods=['POST'])
-    def use_llm_config(config_id):
-        """使用指定的LLM配置"""
-        try:
-            from backend.database import LLMConfig
-            
-            config = LLMConfig.query.get_or_404(config_id)
-            config_dict = config.to_dict(include_api_key=True)
-            
-            return jsonify({
-                'message': '配置加载成功',
-                'config': config_dict
-            })
-            
-        except Exception as e:
-            logger.error(f"加载LLM配置失败: {e}")
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/llm-configs/<int:config_id>/set-default', methods=['POST'])
-    def set_default_llm_config(config_id):
-        """设置默认LLM配置"""
-        try:
-            from backend.database import LLMConfig
-            
-            # 取消所有默认配置
-            LLMConfig.query.filter_by(is_default=True).update({'is_default': False})
-            
-            # 设置新的默认配置
-            config = LLMConfig.query.get_or_404(config_id)
-            config.is_default = True
-            
-            db.session.commit()
-            
-            return jsonify({'message': '默认配置设置成功'})
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"设置默认LLM配置失败: {e}")
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/llm-configs/default', methods=['GET'])
-    def get_default_llm_config():
-        """获取默认LLM配置"""
-        try:
-            from backend.database import LLMConfig
-            
-            config = LLMConfig.query.filter_by(is_default=True).first()
-            if config:
-                return jsonify({
-                    'success': True,
-                    'config': config.to_dict(include_api_key=True)
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'message': '未找到默认配置'
-                })
-                
-        except Exception as e:
-            logger.error(f"获取默认LLM配置失败: {e}")
-            return jsonify({'error': str(e)}), 500
-    
-    # LLM提示词配置API
-    @app.route('/api/llm-prompt-configs', methods=['GET'])
-    def get_llm_prompt_configs():
-        """获取所有LLM提示词配置"""
-        try:
-            from backend.database import LLMPromptConfig
-            
-            configs = LLMPromptConfig.query.all()
-            return jsonify({
-                'success': True,
-                'configs': [config.to_dict() for config in configs]
-            })
-            
-        except Exception as e:
-            logger.error(f"获取LLM提示词配置失败: {e}")
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/llm-prompt-configs', methods=['POST'])
-    def save_llm_prompt_config():
-        """保存LLM提示词配置"""
-        try:
-            from backend.database import LLMPromptConfig
-            
-            data = request.get_json()
-            name = data.get('name')
-            system_prompt = data.get('system_prompt')
-            user_prompt_template = data.get('user_prompt_template')
-            is_default = data.get('is_default', False)
-            
-            if not name or not system_prompt or not user_prompt_template:
-                return jsonify({'error': '请填写完整的提示词配置信息'}), 400
-            
-            # 如果设置为默认，取消其他默认配置
-            if is_default:
-                LLMPromptConfig.query.filter_by(is_default=True).update({'is_default': False})
-            
-            # 创建新配置
-            new_config = LLMPromptConfig(
-                name=name,
-                system_prompt=system_prompt,
-                user_prompt_template=user_prompt_template,
-                is_default=is_default
-            )
-            
-            db.session.add(new_config)
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': '提示词配置保存成功',
-                'config': new_config.to_dict()
-            })
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"保存LLM提示词配置失败: {e}")
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/llm-prompt-configs/<int:config_id>', methods=['GET'])
-    def get_llm_prompt_config(config_id):
-        """获取指定的LLM提示词配置"""
-        try:
-            from backend.database import LLMPromptConfig
-            
-            config = LLMPromptConfig.query.get_or_404(config_id)
-            return jsonify({
-                'success': True,
-                'config': config.to_dict()
-            })
-            
-        except Exception as e:
-            logger.error(f"获取LLM提示词配置失败: {e}")
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/llm-prompt-configs/<int:config_id>', methods=['DELETE'])
-    def delete_llm_prompt_config(config_id):
-        """删除LLM提示词配置"""
-        try:
-            from backend.database import LLMPromptConfig
-            
-            config = LLMPromptConfig.query.get_or_404(config_id)
-            db.session.delete(config)
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': '提示词配置删除成功'
-            })
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"删除LLM提示词配置失败: {e}")
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/llm-prompt-configs/default', methods=['GET'])
-    def get_default_llm_prompt_config():
-        """获取默认LLM提示词配置"""
-        try:
-            from backend.database import LLMPromptConfig
-            
-            config = LLMPromptConfig.query.filter_by(is_default=True).first()
-            if config:
-                return jsonify({
-                    'success': True,
-                    'config': config.to_dict()
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'message': '未找到默认提示词配置'
-                })
-                
-        except Exception as e:
-            logger.error(f"获取默认LLM提示词配置失败: {e}")
-            return jsonify({'error': str(e)}), 500
+    # LLM提示词配置API已移除
     
     return app
 

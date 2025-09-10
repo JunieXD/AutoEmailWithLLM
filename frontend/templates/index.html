@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}自动套磁邮件系统{% endblock %}
+{% block title %}自动套磁系统{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
@@ -8,10 +8,10 @@
         <div class="col-lg-10">
             <!-- 欢迎横幅 -->
             <div class="jumbotron bg-primary text-white rounded p-5 mb-4" style="font-family: 'Microsoft YaHei', 'SimHei', '黑体', sans-serif;">
-                <h1 class="display-4"><i class="bi bi-envelope-heart"></i>自动套磁邮件系统</h1>
+                <h1 class="display-4"><i class="bi bi-envelope-heart"></i>自动套磁系统</h1>
                 <p class="lead">智能化的套磁邮件发送平台，助您高效管理教授信息和邮件发送</p>
                 <hr class="my-4">
-                <p>使用AI技术生成个性化套磁邮件，提高套磁成功率</p>
+                <p>使用文档模板发送个性化套磁邮件，提高套磁成功率</p>
             </div>
 
             <!-- 功能模块卡片 -->
@@ -32,7 +32,7 @@
                         <div class="card-body text-center">
                             <i class="bi bi-envelope-plus text-success" style="font-size: 3rem;"></i>
                             <h5 class="card-title mt-3">邮件发送</h5>
-                            <p class="card-text">AI生成或使用模板发送个性化套磁邮件</p>
+                            <p class="card-text">使用文档模板发送个性化套磁邮件</p>
                             <a href="/email-generator" class="btn btn-success">开始发送</a>
                         </div>
                     </div>
@@ -54,7 +54,7 @@
                         <div class="card-body text-center">
                             <i class="bi bi-gear-fill text-warning" style="font-size: 3rem;"></i>
                             <h5 class="card-title mt-3">系统设置</h5>
-                            <p class="card-text">配置邮件服务器和AI模型参数</p>
+                            <p class="card-text">配置邮件服务器和系统参数</p>
                             <a href="/settings" class="btn btn-warning">进入设置</a>
                         </div>
                     </div>
@@ -82,8 +82,8 @@
                 <div class="col-md-4">
                     <div class="card bg-light">
                         <div class="card-body text-center">
-                            <h3 class="text-info" id="success-rate">-</h3>
-                            <p class="mb-0">成功率</p>
+                            <h3 class="text-info" id="total-users">-</h3>
+                            <p class="mb-0">用户总数</p>
                         </div>
                     </div>
                 </div>
@@ -95,13 +95,11 @@
 <script>
 // 加载统计数据
 document.addEventListener('DOMContentLoaded', function() {
-    // 加载教授总数
+    // 加载教授统计
     fetch('/api/professors')
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                document.getElementById('total-professors').textContent = data.professors.length;
-            }
+            document.getElementById('total-professors').textContent = data.length;
         })
         .catch(error => {
             console.error('Error loading professors:', error);
@@ -112,19 +110,22 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch('/api/email-records')
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                const totalEmails = data.records.length;
-                const successEmails = data.records.filter(record => record.status === 'sent').length;
-                const successRate = totalEmails > 0 ? Math.round((successEmails / totalEmails) * 100) : 0;
-                
-                document.getElementById('total-emails').textContent = totalEmails;
-                document.getElementById('success-rate').textContent = successRate + '%';
-            }
+            document.getElementById('total-emails').textContent = data.length;
         })
         .catch(error => {
             console.error('Error loading email records:', error);
             document.getElementById('total-emails').textContent = '0';
-            document.getElementById('success-rate').textContent = '0%';
+        });
+    
+    // 加载用户总数
+    fetch('/api/users')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('total-users').textContent = data.length;
+        })
+        .catch(error => {
+            console.error('Error loading users:', error);
+            document.getElementById('total-users').textContent = '0';
         });
 });
 </script>

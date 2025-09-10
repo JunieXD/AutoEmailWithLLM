@@ -644,7 +644,7 @@ class ProfessorManager {
 
     // 下载CSV模板
     downloadTemplate() {
-        const csvContent = 'name,email,university,department,research_area,introduction\n教授姓名,professor@university.edu,大学名称,院系名称,研究领域,教授介绍';
+        const csvContent = 'name,email,university,department,research_area,introduction\n# 必填字段：name(姓名), email(邮箱), university(大学), department(院系)\n# 可选字段：research_area(研究领域), introduction(教授介绍)\n张教授,zhang@university.edu,清华大学,计算机科学与技术学院,机器学习,专注于机器学习算法研究';
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -825,6 +825,3 @@ window.showImportModal = () => window.ProfessorManager.showImportModal();
 window.importProfessors = () => window.ProfessorManager.importCSV();
 window.filterProfessors = () => window.ProfessorManager.filterProfessors();
 window.clearFilters = () => window.ProfessorManager.clearFilters();
-
-// 创建ProfessorManager实例
-window.ProfessorManager = new ProfessorManager();

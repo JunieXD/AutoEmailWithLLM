@@ -40,67 +40,7 @@ class Professor(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
-class LLMConfig(db.Model):
-    """LLM配置模型"""
-    __tablename__ = 'llm_configs'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, comment='配置名称')
-    provider = db.Column(db.String(50), nullable=False, comment='API提供商')
-    api_key_encrypted = db.Column(db.Text, nullable=False, comment='加密的API密钥')
-    api_base = db.Column(db.String(500), comment='API基础URL')
-    model = db.Column(db.String(100), nullable=False, comment='模型名称或推理接入点ID')
-    is_default = db.Column(db.Boolean, default=False, comment='是否为默认配置')
-    created_at = db.Column(db.DateTime, default=get_shanghai_utcnow, comment='创建时间')
-    updated_at = db.Column(db.DateTime, default=get_shanghai_utcnow, onupdate=get_shanghai_utcnow, comment='更新时间')
-    
-    def __repr__(self):
-        return f'<LLMConfig {self.name} - {self.provider}>'
-    
-    def to_dict(self, include_api_key=False):
-        """转换为字典格式"""
-        result = {
-            'id': self.id,
-            'name': self.name,
-            'provider': self.provider,
-            'api_base': self.api_base,
-            'model': self.model,
-            'is_default': self.is_default,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
-        if include_api_key:
-            # 只在需要时包含API密钥（已解密）
-            from backend.config import Config
-            result['api_key'] = Config.decrypt_api_key(self.api_key_encrypted)
-        return result
 
-class LLMPromptConfig(db.Model):
-    """LLM提示词配置模型"""
-    __tablename__ = 'llm_prompt_configs'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, comment='配置名称')
-    system_prompt = db.Column(db.Text, nullable=False, comment='系统提示词')
-    user_prompt_template = db.Column(db.Text, nullable=False, comment='用户提示词模板')
-    is_default = db.Column(db.Boolean, default=False, comment='是否为默认配置')
-    created_at = db.Column(db.DateTime, default=get_shanghai_utcnow, comment='创建时间')
-    updated_at = db.Column(db.DateTime, default=get_shanghai_utcnow, onupdate=get_shanghai_utcnow, comment='更新时间')
-    
-    def __repr__(self):
-        return f'<LLMPromptConfig {self.name}>'
-    
-    def to_dict(self):
-        """转换为字典格式"""
-        return {
-            'id': self.id,
-            'name': self.name,
-            'system_prompt': self.system_prompt,
-            'user_prompt_template': self.user_prompt_template,
-            'is_default': self.is_default,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
 
 class EmailRecord(db.Model):
     """邮件发送记录模型"""

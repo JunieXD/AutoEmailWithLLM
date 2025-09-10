@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}教授管理 - 自动套磁邮件系统{% endblock %}
+{% block title %}教授管理 - 自动套磁系统{% endblock %}
 
 {% block content %}
     <div class="container mt-4">
@@ -25,8 +25,8 @@
                                 <input type="text" class="form-control" id="prof-university" required>
                             </div>
                             <div class="mb-3">
-                                <label for="prof-department" class="form-label">院系</label>
-                                <input type="text" class="form-control" id="prof-department">
+                                <label for="prof-department" class="form-label">院系 *</label>
+                                <input type="text" class="form-control" id="prof-department" required>
                             </div>
                             <div class="mb-3">
                                 <label for="prof-research" class="form-label">研究领域</label>
@@ -110,7 +110,11 @@
                         <div class="mb-3">
                             <label for="csv-file" class="form-label">选择CSV文件</label>
                             <input type="file" class="form-control" id="csv-file" accept=".csv" required>
-                            <div class="form-text">请确保CSV文件包含以下列：姓名, 邮箱, 大学, 院系, 研究领域, 教授介绍</div>
+                            <div class="form-text">
+                                请确保CSV文件包含以下列：<br>
+                                <strong>必填字段：</strong>姓名, 邮箱, 大学, 院系<br>
+                                <strong>可选字段：</strong>研究领域, 教授介绍
+                            </div>
                         </div>
                         <div class="mb-3">
                             <div class="form-check">
@@ -164,9 +168,9 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="edit-prof-department" class="form-label">院系</label>
-                                    <input type="text" class="form-control" id="edit-prof-department">
-                                </div>
+                                <label for="edit-prof-department" class="form-label">院系 *</label>
+                                <input type="text" class="form-control" id="edit-prof-department" required>
+                            </div>
                             </div>
                         </div>
                         <div class="mb-3">

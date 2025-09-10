@@ -138,14 +138,22 @@ class EmailSender {
     getDocumentEmailFormData() {
         const selectedProfessors = this.getDocumentSelectedProfessors();
         const selectedDocuments = this.getSelectedDocuments();
+        const selectedAttachments = this.getSelectedAttachments();
         
         return {
             professors: selectedProfessors,
             documents: selectedDocuments,
             subject: document.getElementById('doc-email-subject')?.value,
-            content: document.getElementById('doc-content')?.value,
-            send_interval: parseInt(document.getElementById('doc-send-interval')?.value) || 5
+            content: '', // HTML模板中没有doc-content元素
+            send_interval: 5, // HTML模板中没有doc-send-interval元素，使用默认值
+            attachments: selectedAttachments
         };
+    }
+
+    // 获取选中的附件
+    getSelectedAttachments() {
+        const checkboxes = document.querySelectorAll('#attachment-files-list input[type="checkbox"]:checked');
+        return Array.from(checkboxes).map(cb => parseInt(cb.value));
     }
 
     // 获取选中的教授
@@ -199,7 +207,7 @@ class EmailSender {
         const selectedDocuments = [];
         
         // 首先尝试文档模式的单选按钮
-        const docRadio = document.querySelector('input[name="doc-selected-file"]:checked');
+        const docRadio = document.querySelector('input[name="doc-document"]:checked');
         if (docRadio) {
             selectedDocuments.push({
                 id: parseInt(docRadio.value),

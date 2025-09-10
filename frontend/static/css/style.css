@@ -222,9 +222,10 @@ body {
 }
 
 .document-content p {
-    margin: 6pt 0 !important;
+    margin: 0 !important;
     padding: 0 !important;
     line-height: 1.5 !important;
+    margin-bottom: 6pt !important;
 }
 
 .document-content h1,

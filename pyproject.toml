@@ -12,7 +12,7 @@ dependencies = [
     "flask-sqlalchemy>=3.1.1",
     "loguru>=0.7.3",
     "marshmallow>=4.0.1",
-    "openai>=1.106.1",
+
     "pandas>=2.3.2",
     "python-docx>=1.2.0",
     "python-dotenv>=1.1.1",

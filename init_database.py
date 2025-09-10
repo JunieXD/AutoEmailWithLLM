@@ -25,17 +25,6 @@ def init_database():
         tables = inspector.get_table_names()
         print(f"已创建的表: {tables}")
         
-        # 检查email_records表的字段
-        if 'email_records' in tables:
-            columns = inspector.get_columns('email_records')
-            column_names = [col['name'] for col in columns]
-            print(f"email_records表的字段: {column_names}")
-            
-            if 'sender_name' in column_names and 'sender_email' in column_names:
-                print("sender_name和sender_email字段已存在")
-            else:
-                print("需要添加sender_name和sender_email字段")
-        
     print("数据库初始化完成！")
 
 if __name__ == '__main__':

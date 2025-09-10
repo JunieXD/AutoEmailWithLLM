@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}自动套磁邮件系统{% endblock %}</title>
+    <title>{% block title %}自动套磁系统{% endblock %}</title>
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/bootstrap-icons.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body {% block extra_body_attrs %}{% endblock %}>
     <!-- 导航栏 -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand" href="/">
                 <i class="bi bi-envelope-heart"></i>
-                自动套磁邮件系统
+                自动套磁系统
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -28,7 +28,9 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/records">发送记录</a>
+                        <a class="nav-link" href="/records">
+                            <i class="bi bi-clock-history"></i> 发送记录
+                        </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/professors">
@@ -36,7 +38,9 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/users">用户管理</a>
+                        <a class="nav-link" href="/users">
+                            <i class="bi bi-people"></i> 用户管理
+                        </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/settings">

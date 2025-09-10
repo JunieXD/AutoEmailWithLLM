@@ -21,10 +21,7 @@ class Config:
     MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'false').lower() in ['true', 'on', '1']
     MAIL_USE_SSL = os.environ.get('MAIL_USE_SSL', 'false').lower() in ['true', 'on', '1']
     
-    # LLM配置
-    LLM_API_KEY = os.environ.get('LLM_API_KEY') or ''
-    LLM_API_BASE = os.environ.get('LLM_API_BASE') or 'https://api.openai.com/v1'
-    LLM_MODEL = os.environ.get('LLM_MODEL') or 'gpt-3.5-turbo'
+    # LLM配置已移除
     
     # 文件上传配置
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB

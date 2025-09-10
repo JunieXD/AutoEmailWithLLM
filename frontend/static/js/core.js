@@ -45,8 +45,8 @@ class AppCore {
         // 根据页面路径加载对应的数据
         if (path === '/professors' && window.ProfessorManager) {
             window.ProfessorManager.loadProfessors();
-        } else if (path === '/email-generator' && window.ProfessorManager) {
-            if (window.ProfessorManager.loadProfessorsForSelection) {
+        } else if (path === '/email-generator') {
+            if (window.ProfessorManager && window.ProfessorManager.loadProfessorsForSelection) {
                 // 为AI生成模式单个选择加载教授数据
                 window.ProfessorManager.loadProfessorsForSelection('ai-select-professor', null);
                 // 为AI生成模式批量选择加载教授数据（按学院）
@@ -56,6 +56,12 @@ class AppCore {
                 // 为文档模式批量选择加载教授数据（按学院）
                 window.ProfessorManager.loadProfessorsByDepartment('doc-select-university', 'doc-select-department', 'doc-batch-professors-list');
             }
+            // 延迟加载用户数据，确保EmailGenerator实例已创建
+            setTimeout(() => {
+                if (window.EmailGenerator && window.EmailGenerator.loadUsersForDocument) {
+                    window.EmailGenerator.loadUsersForDocument();
+                }
+            }, 100);
         } else if (path === '/records' && window.RecordsManager) {
             window.RecordsManager.loadEmailRecords();
         }
@@ -156,16 +162,19 @@ class AppCore {
                      // 为文档模式批量选择加载教授数据（按学院）
                      window.ProfessorManager.loadProfessorsByDepartment('doc-select-university', 'doc-select-department', 'doc-batch-professors-list');
                 }
-                if (window.EmailGenerator) {
-                    // 为AI生成模式加载用户
-                    if (window.EmailGenerator.loadUsersForAI) {
-                        window.EmailGenerator.loadUsersForAI();
+                // 延迟检查EmailGenerator实例，确保它已经被创建
+                setTimeout(() => {
+                    if (window.EmailGenerator) {
+                        // 为AI生成模式加载用户
+                        if (window.EmailGenerator.loadUsersForAI) {
+                            window.EmailGenerator.loadUsersForAI();
+                        }
+                        // 为文档模式加载用户
+                        if (window.EmailGenerator.loadUsersForDocument) {
+                            window.EmailGenerator.loadUsersForDocument();
+                        }
                     }
-                    // 为文档模式加载用户
-                    if (window.EmailGenerator.loadUsersForDocument) {
-                        window.EmailGenerator.loadUsersForDocument();
-                    }
-                }
+                }, 100);
                 break;
             case 'email-records':
                 if (window.RecordsManager) {

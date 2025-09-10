@@ -97,6 +97,18 @@ class ImportService:
             
             for index, row in df.iterrows():
                 try:
+                    # 验证必填字段
+                    required_fields = {
+                        'name': '姓名',
+                        'email': '邮箱', 
+                        'university': '大学',
+                        'department': '院系'
+                    }
+                    
+                    for field, field_name in required_fields.items():
+                        if not row.get(field) or str(row.get(field)).strip() == '':
+                            raise ValueError(f"{field_name}不能为空")
+                    
                     # 检查是否已存在
                     existing_professor = Professor.query.filter_by(email=row['email']).first()
                     
