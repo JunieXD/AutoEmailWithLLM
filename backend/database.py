@@ -75,6 +75,33 @@ class LLMConfig(db.Model):
             result['api_key'] = Config.decrypt_api_key(self.api_key_encrypted)
         return result
 
+class LLMPromptConfig(db.Model):
+    """LLM提示词配置模型"""
+    __tablename__ = 'llm_prompt_configs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, comment='配置名称')
+    system_prompt = db.Column(db.Text, nullable=False, comment='系统提示词')
+    user_prompt_template = db.Column(db.Text, nullable=False, comment='用户提示词模板')
+    is_default = db.Column(db.Boolean, default=False, comment='是否为默认配置')
+    created_at = db.Column(db.DateTime, default=get_shanghai_utcnow, comment='创建时间')
+    updated_at = db.Column(db.DateTime, default=get_shanghai_utcnow, onupdate=get_shanghai_utcnow, comment='更新时间')
+    
+    def __repr__(self):
+        return f'<LLMPromptConfig {self.name}>'
+    
+    def to_dict(self):
+        """转换为字典格式"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'system_prompt': self.system_prompt,
+            'user_prompt_template': self.user_prompt_template,
+            'is_default': self.is_default,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
 class EmailRecord(db.Model):
     """邮件发送记录模型"""
     __tablename__ = 'email_records'

@@ -205,7 +205,36 @@ function formatFileSize(bytes) {
 }
 
 // 移除文件
-function removeFile(fileId) {
+async function removeFile(fileId) {
+    const fileToRemove = userFiles.find(file => file.id === fileId);
+    if (!fileToRemove) {
+        console.error('文件不存在:', fileId);
+        return;
+    }
+    
+    // 如果是服务器文件，需要调用API删除
+    if (fileToRemove.isServerFile && fileToRemove.serverId) {
+        try {
+            const response = await fetch(`/api/users/${currentEditingUserId}/files/${fileToRemove.serverId}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
+            if (!response.ok) {
+                showAlert(result.error || '删除文件失败', 'danger');
+                return;
+            }
+            
+            showAlert('文件删除成功', 'success');
+        } catch (error) {
+            console.error('删除文件失败:', error);
+            showAlert('删除文件失败，请检查网络连接', 'danger');
+            return;
+        }
+    }
+    
+    // 从本地数组中移除文件
     userFiles = userFiles.filter(file => file.id !== fileId);
     updateFilesDisplay();
 }
@@ -400,10 +429,16 @@ function editUser(userId) {
     // 填充表单
     document.getElementById('userName').value = user.name || '';
     document.getElementById('userEmail').value = user.email || '';
-    document.getElementById('emailPassword').value = user.email_password || '';
+    // 编辑时不填充邮箱授权码，保持为空让用户选择是否更新
+    document.getElementById('emailPassword').value = '';
     document.getElementById('smtpServer').value = user.smtp_server || '';
     document.getElementById('smtpPort').value = user.smtp_port || '';
     document.getElementById('description').value = user.description || '';
+    
+    // 编辑模式下邮箱授权码不是必填的
+    const emailPasswordField = document.getElementById('emailPassword');
+    emailPasswordField.removeAttribute('required');
+    emailPasswordField.placeholder = '留空则保持原密码不变';
     
     // 加载用户文件
     loadUserFiles(userId);
@@ -470,6 +505,11 @@ function resetForm() {
     currentEditingUserId = null;
     document.getElementById('userForm').reset();
     document.getElementById('userModalTitle').textContent = '添加用户';
+    
+    // 重置邮箱授权码字段为必填
+    const emailPasswordField = document.getElementById('emailPassword');
+    emailPasswordField.setAttribute('required', '');
+    emailPasswordField.placeholder = '';
     
     // 重置文件列表
     userFiles = [];

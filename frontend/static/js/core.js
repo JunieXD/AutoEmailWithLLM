@@ -58,8 +58,6 @@ class AppCore {
             }
         } else if (path === '/records' && window.RecordsManager) {
             window.RecordsManager.loadEmailRecords();
-        } else if (path === '/settings' && window.SettingsManager) {
-            window.SettingsManager.loadSettings();
         }
         
         // 检查是否在主页面（有tab-content元素的页面）
@@ -79,9 +77,7 @@ class AppCore {
             if (window.RecordsManager) {
                 window.RecordsManager.loadEmailRecords();
             }
-            if (window.SettingsManager) {
-                window.SettingsManager.loadSettings();
-            }
+            // Settings页面有自己的初始化逻辑
             
             // 根据URL路径或hash显示对应标签页
             let targetTab = 'email-generator'; // 默认标签页

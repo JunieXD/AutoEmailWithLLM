@@ -181,8 +181,8 @@ class ImportService:
             logger.error(f"生成CSV模板失败: {str(e)}")
             raise Exception(f"生成模板失败: {str(e)}")
     
-    def export_professors_to_csv(self, professors: List[Professor] = None) -> str:
-        """导出教授信息到CSV"""
+    def export_professors_to_csv_content(self, professors: List[Professor] = None) -> str:
+        """导出教授信息为CSV内容字符串"""
         try:
             if professors is None:
                 professors = Professor.query.all()
@@ -204,9 +204,46 @@ class ImportService:
             
             df = pd.DataFrame(data)
             
+            # 直接返回CSV内容字符串
+            csv_content = df.to_csv(index=False, encoding='utf-8-sig')
+            
+            logger.info(f"生成 {len(professors)} 个教授信息的CSV内容")
+            return csv_content
+            
+        except Exception as e:
+            logger.error(f"生成CSV内容失败: {str(e)}")
+            raise Exception(f"导出失败: {str(e)}")
+    
+    def export_professors_to_csv(self, professors: List[Professor] = None) -> str:
+        """导出教授信息到CSV文件（保留用于其他需要文件的场景）"""
+        try:
+            if professors is None:
+                professors = Professor.query.all()
+            
+            if not professors:
+                raise Exception("没有可导出的教授信息")
+            
+            # 转换为DataFrame
+            data = []
+            for prof in professors:
+                data.append({
+                    'name': prof.name,
+                    'email': prof.email,
+                    'university': prof.university,
+                    'department': prof.department or '',
+                    'research_area': prof.research_area or '',
+                    'introduction': prof.introduction or ''
+                })
+            
+            df = pd.DataFrame(data)
+            
+            # 创建导出目录（在uploads下创建exports子目录）
+            from backend.config import Config
+            export_dir = os.path.join(Config.UPLOAD_FOLDER, 'exports')
+            os.makedirs(export_dir, exist_ok=True)
+            
             # 保存到文件
-            export_path = os.path.join('uploads', f'professors_export_{pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")}.csv')
-            os.makedirs('uploads', exist_ok=True)
+            export_path = os.path.join(export_dir, f'professors_export_{pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")}.csv')
             df.to_csv(export_path, index=False, encoding='utf-8-sig')
             
             logger.info(f"导出 {len(professors)} 个教授信息到 {export_path}")

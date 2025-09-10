@@ -115,12 +115,31 @@ class ProfessorManager {
         try {
             const professors = await Utils.apiRequest('/api/professors');
             
+            // 检查是否为AI生成模式，如果是则过滤掉没有研究方向的教授
+            let filteredProfessors = professors;
+            let excludedCount = 0;
+            
+            if (professorSelectId && (professorSelectId.includes('ai-') || professorSelectId.includes('ai_'))) {
+                filteredProfessors = professors.filter(prof => {
+                    const hasResearchArea = prof.research_area && prof.research_area.trim() !== '';
+                    if (!hasResearchArea) {
+                        excludedCount++;
+                    }
+                    return hasResearchArea;
+                });
+                
+                // 如果有教授被过滤掉，显示提醒
+                if (excludedCount > 0) {
+                    Utils.showToast(`注意：已过滤掉 ${excludedCount} 位没有研究方向信息的教授，AI生成功能需要教授的研究方向信息`, 'warning');
+                }
+            }
+            
             // 加载教授选择框
             const professorSelect = document.getElementById(professorSelectId);
             if (professorSelect) {
                 professorSelect.innerHTML = '<option value="">请选择教授</option>';
                 
-                professors.forEach(prof => {
+                filteredProfessors.forEach(prof => {
                     const option = document.createElement('option');
                     option.value = prof.id;
                     // 显示更详细的信息：姓名 - 学校 - 学院 - 邮箱
@@ -130,6 +149,7 @@ class ProfessorManager {
                     option.dataset.department = prof.department || '';
                     option.dataset.email = prof.email;
                     option.dataset.name = prof.name;
+                    option.dataset.researchArea = prof.research_area || '';
                     professorSelect.appendChild(option);
                 });
             }
@@ -138,7 +158,7 @@ class ProfessorManager {
             if (universitySelectId) {
                 const universitySelect = document.getElementById(universitySelectId);
                 if (universitySelect) {
-                    const universities = [...new Set(professors.map(prof => prof.university))].sort();
+                    const universities = [...new Set(filteredProfessors.map(prof => prof.university))].sort();
                     universitySelect.innerHTML = '<option value="">请选择大学</option>';
                     
                     universities.forEach(university => {
@@ -278,7 +298,25 @@ class ProfessorManager {
         const professorList = document.getElementById(professorListId);
         if (!professorList) return;
         
-        const filteredProfessors = professors.filter(prof => departments.includes(prof.department));
+        let filteredProfessors = professors.filter(prof => departments.includes(prof.department));
+        
+        // 如果是AI生成模式，过滤掉没有研究方向的教授
+        let excludedCount = 0;
+        if (professorListId && professorListId.includes('ai-')) {
+            const originalCount = filteredProfessors.length;
+            filteredProfessors = filteredProfessors.filter(prof => {
+                const hasResearchArea = prof.research_area && prof.research_area.trim() !== '';
+                if (!hasResearchArea) {
+                    excludedCount++;
+                }
+                return hasResearchArea;
+            });
+            
+            // 如果有教授被过滤掉，显示提醒
+            if (excludedCount > 0) {
+                Utils.showToast(`注意：已过滤掉 ${excludedCount} 位没有研究方向信息的教授，AI生成功能需要教授的研究方向信息`, 'warning');
+            }
+        }
         
         if (filteredProfessors.length === 0) {
             professorList.innerHTML = '<p class="text-muted">该学院暂无教授数据</p>';
@@ -531,16 +569,13 @@ class ProfessorManager {
                                 </p>
                                 ${professor.introduction ? `<p class="card-text"><small class="text-muted">${professor.introduction}</small></p>` : ''}
                             </div>
-                            <div class="col-md-4 text-end">
+                            <div class="col-md-4 d-flex align-items-center justify-content-end">
                                 <div class="btn-group-vertical" role="group">
                                     <button class="btn btn-outline-primary btn-sm" onclick="window.ProfessorManager.editProfessor(${professor.id})">
                                         <i class="bi bi-pencil"></i> 编辑
                                     </button>
                                     <button class="btn btn-outline-danger btn-sm" onclick="window.ProfessorManager.deleteProfessor(${professor.id})">
                                         <i class="bi bi-trash"></i> 删除
-                                    </button>
-                                    <button class="btn btn-outline-success btn-sm" onclick="window.EmailGenerator.generateEmailForProfessor(${professor.id})">
-                                        <i class="bi bi-envelope"></i> 生成邮件
                                     </button>
                                 </div>
                             </div>
@@ -554,15 +589,57 @@ class ProfessorManager {
     }
 
     // 导出教授信息
-    exportProfessors() {
-        const universityFilter = document.getElementById('universityFilter')?.value || '';
-        let url = '/api/export/professors';
-        
-        if (universityFilter) {
-            url += `?university=${encodeURIComponent(universityFilter)}`;
+    async exportProfessors() {
+        try {
+            const universityFilter = document.getElementById('universityFilter')?.value || '';
+            let url = '/api/export/professors';
+            
+            if (universityFilter) {
+                url += `?university=${encodeURIComponent(universityFilter)}`;
+            }
+            
+            // 使用fetch获取文件数据
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('导出失败');
+            }
+            
+            // 获取文件名（从响应头或生成默认名称）
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'professors_export.csv';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            } else {
+                // 生成带时间戳的文件名
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '').replace('T', '_');
+                filename = `professors_export_${timestamp}.csv`;
+            }
+            
+            // 创建blob和下载链接
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            
+            // 创建临时下载链接并触发下载
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = filename;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            
+            // 清理
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(downloadUrl);
+            
+            Utils.showToast('导出成功', 'success');
+            
+        } catch (error) {
+            console.error('导出失败:', error);
+            Utils.showToast('导出失败: ' + error.message, 'error');
         }
-        
-        window.open(url, '_blank');
     }
 
     // 下载CSV模板
@@ -723,18 +800,7 @@ class ProfessorManager {
     }
 
     // 跳转到邮件生成页面
-    generateEmailForProfessor(professorId) {
-        // 切换到邮件生成页面
-        window.AppCore.showTab('email-generator');
-        document.querySelector('.nav-link[data-tab="email-generator"]')?.classList.add('active');
-        document.querySelectorAll('.nav-link:not([data-tab="email-generator"])')?.forEach(l => l.classList.remove('active'));
-        
-        // 选择对应的教授
-        const selectElement = document.getElementById('select-professor');
-        if (selectElement) {
-            selectElement.value = professorId;
-        }
-    }
+
 }
 
 // 创建全局实例
@@ -759,3 +825,6 @@ window.showImportModal = () => window.ProfessorManager.showImportModal();
 window.importProfessors = () => window.ProfessorManager.importCSV();
 window.filterProfessors = () => window.ProfessorManager.filterProfessors();
 window.clearFilters = () => window.ProfessorManager.clearFilters();
+
+// 创建ProfessorManager实例
+window.ProfessorManager = new ProfessorManager();

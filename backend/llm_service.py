@@ -46,11 +46,13 @@ class LLMService:
             base_url=self.api_base
         )
     
-    def generate_email(self, 
-                      professor_info: Dict[str, str], 
-                      self_introduction: str,
-                      email_template: Optional[str] = None,
-                      additional_requirements: Optional[str] = None) -> str:
+    def generate_email(self,
+                       professor_info: Dict[str, str],
+                       self_introduction: str,
+                       template_content: Optional[str] = None,
+                       additional_requirements: Optional[str] = None,
+                       prompt_config: Optional[Dict] = None,
+                       format_type: str = 'html') -> str:
         """
         生成个性化套磁信内容
         
@@ -68,8 +70,10 @@ class LLMService:
             prompt = self._build_prompt(
                 professor_info=professor_info,
                 self_introduction=self_introduction,
-                email_template=email_template,
-                additional_requirements=additional_requirements
+                template_content=template_content,
+                additional_requirements=additional_requirements,
+                prompt_config=prompt_config,
+                format_type=format_type
             )
             
             # 调用LLM生成内容
@@ -99,14 +103,36 @@ class LLMService:
             # 返回默认模板
             return self._get_default_template(professor_info, self_introduction)
     
-    def _build_prompt(self, 
-                     professor_info: Dict[str, str], 
-                     self_introduction: str,
-                     email_template: Optional[str] = None,
-                     additional_requirements: Optional[str] = None) -> str:
+    def _build_prompt(self,
+                      professor_info: Dict[str, str],
+                      self_introduction: str,
+                      template_content: Optional[str] = None,
+                      additional_requirements: Optional[str] = None,
+                      prompt_config: Optional[Dict] = None,
+                      format_type: str = 'html') -> str:
         """
         构建LLM提示词
         """
+        # 使用自定义提示词配置或默认提示
+        if prompt_config and prompt_config.get('user_prompt_template'):
+            # 使用自定义用户提示模板
+            template_section = f"\n## 邮件模板参考：\n{template_content}" if template_content else ""
+            additional_section = f"\n## 额外要求：\n{additional_requirements}" if additional_requirements else ""
+            
+            prompt = prompt_config['user_prompt_template'].format(
+                professor_name=professor_info.get('name', '未知'),
+                professor_university=professor_info.get('university', '未知'),
+                professor_department=professor_info.get('department', '未知'),
+                professor_research_area=professor_info.get('research_area', '未知'),
+                professor_introduction=professor_info.get('introduction', '无'),
+                self_introduction=self_introduction,
+                template_section=template_section,
+                additional_section=additional_section,
+                format_instruction='使用纯文本格式，段落之间用空行分隔，不要使用HTML标签' if format_type == 'text' else '使用HTML格式'
+            )
+            return prompt
+        
+        # 使用默认提示构建
         prompt_parts = [
             "请根据以下信息生成一封个性化的套磁邮件：\n",
             "\n## 教授信息：",
@@ -119,11 +145,11 @@ class LLMService:
             self_introduction,
         ]
         
-        if email_template:
-            prompt_parts.extend([
-                "\n## 邮件模板参考：",
-                email_template
-            ])
+        if template_content:
+             prompt_parts.extend([
+                 "\n## 邮件模板参考：",
+                 template_content
+             ])
         
         if additional_requirements:
             prompt_parts.extend([
@@ -131,17 +157,34 @@ class LLMService:
                 additional_requirements
             ])
         
-        prompt_parts.extend([
-            "\n## 要求：",
-            "1. 邮件应该专业、诚恳且个性化",
-            "2. 突出申请者与教授研究领域的匹配度",
-            "3. 体现申请者的学术背景和研究兴趣",
-            "4. 语言要礼貌得体，符合学术邮件规范",
-            "5. 长度适中，不要过于冗长",
-            "6. 如果教授信息中有具体的研究内容，要针对性地提及",
-            "7. 邮件应该包含明确的申请意图",
-            "\n请直接返回邮件正文内容，不需要包含主题行。"
-        ])
+        # 根据格式类型调整要求
+        if format_type == 'text':
+            prompt_parts.extend([
+                "\n## 要求：",
+                "1. 邮件应该专业、诚恳且个性化",
+                "2. 突出申请者与教授研究领域的匹配度",
+                "3. 体现申请者的学术背景和研究兴趣",
+                "4. 语言要礼貌得体，符合学术邮件规范",
+                "5. 长度适中，不要过于冗长",
+                "6. 如果教授信息中有具体的研究内容，要针对性地提及",
+                "7. 邮件应该包含明确的申请意图",
+                "8. 请使用纯文本格式返回邮件内容，段落之间用空行分隔",
+                "9. 不要使用HTML标签或Markdown格式",
+                "\n请直接返回纯文本格式的邮件正文内容，不需要包含主题行。"
+            ])
+        else:
+            prompt_parts.extend([
+                "\n## 要求：",
+                "1. 邮件应该专业、诚恳且个性化",
+                "2. 突出申请者与教授研究领域的匹配度",
+                "3. 体现申请者的学术背景和研究兴趣",
+                "4. 语言要礼貌得体，符合学术邮件规范",
+                "5. 长度适中，不要过于冗长",
+                "6. 如果教授信息中有具体的研究内容，要针对性地提及",
+                "7. 邮件应该包含明确的申请意图",
+                "8. 请使用HTML格式返回邮件内容，包含适当的段落标签<p>和换行<br>",
+                "\n请直接返回HTML格式的邮件正文内容，不需要包含主题行。"
+            ])
         
         return "\n".join(prompt_parts)
     
@@ -153,20 +196,20 @@ class LLMService:
         university = professor_info.get('university', '')
         research_area = professor_info.get('research_area', '')
         
-        template = f"""尊敬的{professor_name}：
+        template = f"""<p>尊敬的{professor_name}：</p>
 
-您好！我是一名对{research_area}领域非常感兴趣的学生。通过了解您在{university}的研究工作，我对您的研究方向产生了浓厚的兴趣。
+<p>您好！我是一名对{research_area}领域非常感兴趣的学生。通过了解您在{university}的研究工作，我对您的研究方向产生了浓厚的兴趣。</p>
 
-{self_introduction}
+<p>{self_introduction}</p>
 
-我希望能够有机会在您的指导下进行研究学习。如果您目前有招收学生的计划，我非常希望能够进一步交流。
+<p>我希望能够有机会在您的指导下进行研究学习。如果您目前有招收学生的计划，我非常希望能够进一步交流。</p>
 
-感谢您抽出宝贵时间阅读这封邮件，期待您的回复。
+<p>感谢您抽出宝贵时间阅读这封邮件，期待您的回复。</p>
 
-此致
-敬礼！
+<p>此致<br>
+敬礼！</p>
 
-{datetime.now().strftime('%Y年%m月%d日')}"""
+<p>{datetime.now().strftime('%Y年%m月%d日')}</p>"""
         
         return template
     

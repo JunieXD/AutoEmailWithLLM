@@ -71,21 +71,6 @@ class DocumentService:
             HTML字符串
         """
         html_parts = []
-        # 添加更完整的CSS样式以保持文档格式
-        html_parts.append('''
-<div class="document-content" style="
-    font-family: 'Times New Roman', Times, serif;
-    font-size: 12pt;
-    line-height: 1.5;
-    color: #000;
-    max-width: 100%;
-    margin: 0;
-    padding: 20px;
-    background-color: #fff;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-">
-''')
         
         # 按文档顺序处理所有元素
         # 使用document的element属性来获取正确的顺序
@@ -113,9 +98,11 @@ class DocumentService:
             for table in doc.tables:
                 html_parts.append(self._convert_table_to_html(table))
         
-        html_parts.append('</div>')
+        # 将内容包装在样式容器中，确保邮件发送时保持一致的格式（移除边框等视觉包装）
+        content = '\n'.join(html_parts)
+        wrapped_content = f'''<div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.6; color: #333; word-wrap: break-word;">{content}</div>'''
         
-        return '\n'.join(html_parts)
+        return wrapped_content
     
     def _convert_paragraph_to_html(self, paragraph) -> str:
         """
@@ -271,30 +258,19 @@ class DocumentService:
                 except:
                     pass
             
-            # 字体粗细
+            # 应用样式 - 优先使用HTML语义标签，然后应用CSS样式
+            # 首先应用HTML语义标签
             if run.bold:
-                span_styles.append('font-weight: bold')
-            
-            # 字体倾斜
+                text = f'<strong>{text}</strong>'
             if run.italic:
-                span_styles.append('font-style: italic')
-            
-            # 下划线
+                text = f'<em>{text}</em>'
             if run.underline:
-                span_styles.append('text-decoration: underline')
+                text = f'<u>{text}</u>'
             
-            # 应用样式
+            # 然后应用CSS样式（如果有的话）
             if span_styles:
                 style_str = '; '.join(span_styles)
                 text = f'<span style="{style_str}">{text}</span>'
-            else:
-                # 如果没有其他样式，使用简单的HTML标签
-                if run.bold:
-                    text = f'<strong>{text}</strong>'
-                if run.italic:
-                    text = f'<em>{text}</em>'
-                if run.underline:
-                    text = f'<u>{text}</u>'
             
             html_parts.append(text)
         

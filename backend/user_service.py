@@ -184,6 +184,9 @@ class UserService:
             # 更新基本信息
             for field in ['name', 'email', 'email_password', 'smtp_server', 'smtp_port', 'description']:
                 if field in data:
+                    # 如果是邮箱授权码且为空，则不更新
+                    if field == 'email_password' and not data[field]:
+                        continue
                     setattr(user, field, data[field])
             
             # 更新文件（兼容旧版本）
@@ -324,7 +327,7 @@ class UserService:
             logger.error(f'删除用户文件失败: {str(e)}')
             return False, f'删除用户文件失败: {str(e)}'
     
-    def validate_user_data(self, data):
+    def validate_user_data(self, data, is_edit=False):
         """验证用户数据"""
         errors = []
         
@@ -336,7 +339,8 @@ class UserService:
         elif '@' not in data['email']:
             errors.append('邮箱格式不正确')
         
-        if not data.get('email_password'):
+        # 编辑模式下允许邮箱授权码为空（保持原密码不变）
+        if not is_edit and not data.get('email_password'):
             errors.append('邮箱授权码不能为空')
         
         if data.get('smtp_port'):

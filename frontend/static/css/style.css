@@ -264,6 +264,20 @@ body {
     font-family: inherit !important;
 }
 
+.document-content strong,
+.document-content b {
+    font-weight: bold !important;
+}
+
+.document-content em,
+.document-content i {
+    font-style: italic !important;
+}
+
+.document-content u {
+    text-decoration: underline !important;
+}
+
 /* 邮件预览中的文档内容样式 */
 #doc-document-content .document-content {
     max-height: 400px;

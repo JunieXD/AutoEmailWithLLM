@@ -717,7 +717,7 @@ class EmailSender {
             document.getElementById('view-email-subject').textContent = record.subject;
             document.getElementById('view-email-recipient').textContent = record.recipient_email;
             document.getElementById('view-email-time').textContent = new Date(record.send_time).toLocaleString();
-            document.getElementById('view-email-content').textContent = record.content;
+            document.getElementById('view-email-content').innerHTML = record.content || '无内容';
             
             modal.show();
         } catch (error) {

@@ -15,6 +15,12 @@ class EmailGenerator {
         if (emailForm) {
             emailForm.addEventListener('submit', this.handleEmailGeneration.bind(this));
         }
+        
+        // AI邮件生成表单提交
+        const aiEmailForm = document.getElementById('ai-email-form');
+        if (aiEmailForm) {
+            aiEmailForm.addEventListener('submit', this.handleAIEmailGeneration.bind(this));
+        }
 
         // 教授选择变化
         const professorSelect = document.getElementById('select-professor');
@@ -63,18 +69,95 @@ class EmailGenerator {
         }
     }
 
+    // 处理AI邮件生成表单提交
+    async handleAIEmailGeneration(e) {
+        e.preventDefault();
+        
+        const formData = await this.getAIFormData();
+        
+        if (!this.validateAIForm(formData)) {
+            return;
+        }
+        
+        this.showAIGeneratingState();
+        
+        try {
+            const result = await this.generateEmail(formData);
+            this.displayAIGeneratedEmail(result);
+        } catch (error) {
+            Utils.showToast('邮件生成失败: ' + error.message, 'error');
+        } finally {
+            this.hideAIGeneratingState();
+        }
+    }
+
     // 获取表单数据
     getFormData() {
+        // 获取选中的自荐信文档ID
+        const selectedDocRadio = document.querySelector('input[name="ai-selected-file"]:checked');
+        const selectedDocId = selectedDocRadio ? selectedDocRadio.value : null;
+        
         return {
-            professor_id: document.getElementById('select-professor')?.value,
+            professor_id: document.getElementById('select-professor')?.value || document.getElementById('ai-select-professor')?.value,
             email_type: document.getElementById('email-type')?.value,
             template_id: document.getElementById('template-select')?.value,
             document_id: document.getElementById('document-select')?.value,
+            self_introduction_doc_id: selectedDocId,
             custom_content: document.getElementById('custom-content')?.value,
             tone: document.getElementById('tone-select')?.value || 'formal',
             language: document.getElementById('language-select')?.value || 'chinese',
             include_attachments: document.getElementById('include-attachments')?.checked || false,
-            custom_subject: document.getElementById('ai-email-subject')?.value || ''
+            custom_subject: document.getElementById('ai-email-subject')?.value || '',
+            additional_requirements: document.getElementById('ai-additional-requirements')?.value || ''
+        };
+    }
+
+    // 获取AI表单数据
+    async getAIFormData() {
+        // 获取选中的自荐信文档ID
+        const selectedDocRadio = document.querySelector('input[name="ai-selected-file"]:checked');
+        const selectedDocId = selectedDocRadio ? selectedDocRadio.value : null;
+        
+        // 获取选择模式
+        const selectionMode = document.querySelector('input[name="ai-selection-mode"]:checked')?.value;
+        
+        let professorIds = [];
+        if (selectionMode === 'single') {
+            const professorId = document.getElementById('ai-select-professor')?.value;
+            if (professorId) professorIds = [professorId];
+        } else if (selectionMode === 'batch') {
+            // 批量模式的教授ID获取逻辑
+            const checkboxes = document.querySelectorAll('input[name="ai-selected-professors"]:checked');
+            professorIds = Array.from(checkboxes).map(cb => cb.value);
+        }
+        
+        // 获取默认LLM配置
+        let llmConfig = {};
+        try {
+            const response = await Utils.apiRequest('/api/llm-configs/default');
+            if (response.success && response.config) {
+                llmConfig = {
+                    apiKey: response.config.api_key,
+                    apiBase: response.config.api_base,
+                    model: response.config.model,
+                    provider: response.config.provider
+                };
+            }
+        } catch (error) {
+            console.warn('获取默认LLM配置失败:', error);
+        }
+        
+        return {
+            sender_user_id: document.getElementById('ai-sender-user')?.value,
+            professor_ids: professorIds,
+            selection_mode: selectionMode,
+            self_introduction_doc_id: selectedDocId,
+            custom_subject: document.getElementById('ai-email-subject')?.value || '',
+            additional_requirements: document.getElementById('ai-additional-requirements')?.value || '',
+            tone: 'formal',
+            language: 'chinese',
+            include_attachments: false,
+            llm_config: llmConfig
         };
     }
 
@@ -85,6 +168,24 @@ class EmailGenerator {
             return false;
         }
         
+        // 检查是否选择了自荐信文档（AI生成模式）
+        if (document.getElementById('ai-sender-user') && document.getElementById('ai-sender-user').value) {
+            if (!formData.self_introduction_doc_id) {
+                Utils.showToast('请选择自荐信文档', 'error');
+                return false;
+            }
+        }
+        
+        // 检查教授是否有研究方向（AI生成模式）
+        const professorSelect = document.getElementById('ai-select-professor') || document.getElementById('select-professor');
+        if (professorSelect && professorSelect.value) {
+            const selectedOption = professorSelect.querySelector(`option[value="${professorSelect.value}"]`);
+            if (selectedOption && !selectedOption.dataset.researchArea) {
+                Utils.showToast('所选教授缺少研究方向信息，无法生成个性化邮件', 'error');
+                return false;
+            }
+        }
+        
         if (!formData.email_type) {
             Utils.showToast('请选择邮件类型', 'error');
             return false;
@@ -92,6 +193,26 @@ class EmailGenerator {
         
         if (formData.email_type === 'custom' && !formData.custom_content) {
             Utils.showToast('请输入自定义内容', 'error');
+            return false;
+        }
+        
+        return true;
+    }
+
+    // 验证AI表单
+    validateAIForm(formData) {
+        if (!formData.sender_user_id) {
+            Utils.showToast('请选择发送用户', 'error');
+            return false;
+        }
+        
+        if (!formData.professor_ids || formData.professor_ids.length === 0) {
+            Utils.showToast('请选择至少一个教授', 'error');
+            return false;
+        }
+        
+        if (!formData.self_introduction_doc_id) {
+            Utils.showToast('请选择自荐信文档', 'error');
             return false;
         }
         
@@ -139,6 +260,24 @@ class EmailGenerator {
         }
     }
 
+    // 显示AI生成中状态
+    showAIGeneratingState() {
+        const generateBtn = document.getElementById('ai-generate-email-btn');
+        if (generateBtn) {
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> 生成中...';
+        }
+    }
+
+    // 隐藏AI生成中状态
+    hideAIGeneratingState() {
+        const generateBtn = document.getElementById('ai-generate-email-btn');
+        if (generateBtn) {
+            generateBtn.disabled = false;
+            generateBtn.innerHTML = '<i class="bi bi-magic"></i> 生成邮件';
+        }
+    }
+
     // 显示生成的邮件
     displayGeneratedEmail(result) {
         this.currentEmailContent = result;
@@ -146,16 +285,26 @@ class EmailGenerator {
         const resultContainer = document.getElementById('email-result');
         if (!resultContainer) return;
         
+        // 检查邮件格式类型
+        const isTextFormat = result.format === 'text' || result.format_type === 'text';
+        const emailContent = result.content || result.email_content || '无内容';
+        
         const html = `
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0"><i class="bi bi-envelope"></i> 生成的邮件</h6>
+                    <h6 class="mb-0">
+                        <i class="bi bi-envelope"></i> 生成的邮件
+                        ${isTextFormat ? '<span class="badge bg-info ms-2">纯文本</span>' : '<span class="badge bg-success ms-2">HTML</span>'}
+                    </h6>
                     <div class="btn-group btn-group-sm">
                         <button class="btn btn-outline-primary" onclick="window.EmailGenerator.copyEmail()">
                             <i class="bi bi-clipboard"></i> 复制
                         </button>
                         <button class="btn btn-outline-success" onclick="window.EmailGenerator.editEmail()">
                             <i class="bi bi-pencil"></i> 编辑
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="window.EmailGenerator.regenerateEmail()">
+                            <i class="bi bi-arrow-clockwise"></i> 重新生成
                         </button>
                         <button class="btn btn-primary" onclick="window.EmailGenerator.sendEmail()">
                             <i class="bi bi-send"></i> 发送
@@ -172,7 +321,7 @@ class EmailGenerator {
                         </div>
                         <div class="email-content">
                             <strong>内容:</strong>
-                            <div class="mt-2 p-3 bg-light rounded" style="white-space: pre-wrap;">${result.content || result.email_content || '无内容'}</div>
+                            <div class="mt-2 p-3 bg-light rounded" style="white-space: pre-wrap; font-family: ${isTextFormat ? 'monospace' : 'inherit'}; border: 1px solid #dee2e6;">${emailContent}</div>
                         </div>
                         ${result.attachments && result.attachments.length > 0 ? `
                             <div class="mt-3">
@@ -189,6 +338,77 @@ class EmailGenerator {
         
         resultContainer.innerHTML = html;
         resultContainer.style.display = 'block';
+        
+        // 滚动到结果区域
+        resultContainer.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // 显示AI生成的邮件
+    displayAIGeneratedEmail(result) {
+        this.currentEmailContent = result;
+        
+        const resultContainer = document.getElementById('ai-generated-email-content');
+        if (!resultContainer) return;
+        
+        // 检查邮件格式类型
+        const isTextFormat = result.format === 'text' || result.format_type === 'text';
+        const emailContent = result.content || result.email_content || '无内容';
+        
+        const html = `
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="bi bi-envelope"></i> 生成的邮件
+                        ${isTextFormat ? '<span class="badge bg-info ms-2">纯文本</span>' : '<span class="badge bg-success ms-2">HTML</span>'}
+                    </h6>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" onclick="window.EmailGenerator.copyEmail()">
+                            <i class="bi bi-clipboard"></i> 复制
+                        </button>
+                        <button class="btn btn-outline-success" onclick="window.EmailGenerator.editEmail()">
+                            <i class="bi bi-pencil"></i> 编辑
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="window.EmailGenerator.regenerateEmail()">
+                            <i class="bi bi-arrow-clockwise"></i> 重新生成
+                        </button>
+                        <button class="btn btn-primary" onclick="window.EmailGenerator.sendEmail()">
+                            <i class="bi bi-send"></i> 发送
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="email-preview">
+                        <div class="mb-3">
+                            <strong>主题:</strong> ${result.subject || '无主题'}
+                        </div>
+                        <div class="mb-3">
+                            <strong>收件人:</strong> ${result.recipient || result.professor_name || '未指定'}
+                        </div>
+                        <div class="email-content">
+                            <strong>内容:</strong>
+                            <div class="mt-2 p-3 bg-light rounded" style="white-space: pre-wrap; font-family: ${isTextFormat ? 'monospace' : 'inherit'}; border: 1px solid #dee2e6;">${emailContent}</div>
+                        </div>
+                        ${result.attachments && result.attachments.length > 0 ? `
+                            <div class="mt-3">
+                                <strong>附件:</strong>
+                                <ul class="list-unstyled mt-2">
+                                    ${result.attachments.map(att => `<li><i class="bi bi-paperclip"></i> ${att.name}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        resultContainer.innerHTML = html;
+        resultContainer.style.display = 'block';
+        
+        // 显示发送按钮
+        const sendBtn = document.getElementById('ai-send-email-btn');
+        if (sendBtn) {
+            sendBtn.style.display = 'block';
+        }
         
         // 滚动到结果区域
         resultContainer.scrollIntoView({ behavior: 'smooth' });
@@ -426,9 +646,9 @@ class EmailGenerator {
 
     // 文档模式文档选择改变处理
     async onDocumentSelectionChange() {
-        const previewContainer = document.getElementById('doc-document-preview');
+        const documentContentDiv = document.getElementById('doc-document-content');
         
-        if (!previewContainer) return;
+        if (!documentContentDiv) return;
         
         // 获取选中的文档ID
         const selectedRadio = document.querySelector('input[name="doc-selected-file"]:checked');
@@ -450,24 +670,8 @@ class EmailGenerator {
                 const selectedFile = response.documents.files.find(file => file.id == fileId);
                 
                 if (selectedFile) {
-                    // 显示文档信息
-                    const html = `
-                        <div class="card">
-                            <div class="card-body">
-                                <h6 class="card-title">${selectedFile.filename}</h6>
-                                <p class="card-text">
-                                    <small class="text-muted">
-                                        类型: ${selectedFile.file_type}<br>
-                                        大小: ${Utils.formatFileSize(selectedFile.file_size || 0)}<br>
-                                        上传时间: ${selectedFile.upload_time ? new Date(selectedFile.upload_time).toLocaleString() : '未知'}
-                                    </small>
-                                </p>
-                            </div>
-                        </div>
-                    `;
-                    
-                    previewContainer.innerHTML = html;
-                    previewContainer.style.display = 'block';
+                    // 直接显示文档内容
+                    documentContentDiv.style.display = 'block';
                     
                     // 获取并显示文档HTML内容
                     try {
@@ -556,8 +760,12 @@ class EmailGenerator {
         this.currentEmailContent.subject = subject;
         this.currentEmailContent.content = content;
         
-        // 重新显示邮件
-        this.displayGeneratedEmail(this.currentEmailContent);
+        // 重新显示邮件 - 检查是否为AI生成的邮件
+        if (document.getElementById('ai-generated-email-content')) {
+            this.displayAIGeneratedEmail(this.currentEmailContent);
+        } else {
+            this.displayGeneratedEmail(this.currentEmailContent);
+        }
         
         // 关闭模态框
         const modal = bootstrap.Modal.getInstance(document.getElementById('editEmailModal'));
@@ -668,6 +876,52 @@ class EmailGenerator {
         }
     }
 
+    // 为AI模式加载用户文档
+    async loadDocumentsForAI(userId) {
+        try {
+            const response = await Utils.apiRequest(`/api/users/${userId}/documents`);
+            const container = document.getElementById('ai-user-documents-list');
+            
+            if (!container) return;
+            
+            if (response && response.documents && response.documents.files && response.documents.files.length > 0) {
+                // 过滤只显示套磁信类型的文档
+                const coverLetterFiles = response.documents.files.filter(file => file.file_type === 'cover_letter');
+                
+                if (coverLetterFiles.length > 0) {
+                    container.innerHTML = '';
+                    coverLetterFiles.forEach((file, index) => {
+                        const radioId = `ai-file-${file.id}`;
+                        const radioHtml = `
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="ai-selected-file" id="${radioId}" value="${file.id}" ${index === 0 ? 'checked' : ''}>
+                                <label class="form-check-label" for="${radioId}">
+                                    <strong>${file.filename}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        类型: ${file.file_type} | 大小: ${Utils.formatFileSize(file.file_size || 0)}
+                                        ${file.upload_time ? ' | 上传时间: ' + new Date(file.upload_time).toLocaleString() : ''}
+                                    </small>
+                                </label>
+                            </div>
+                        `;
+                        container.innerHTML += radioHtml;
+                    });
+                } else {
+                    container.innerHTML = '<div class="text-muted">该用户暂无套磁信文档</div>';
+                }
+            } else {
+                container.innerHTML = '<div class="text-muted">该用户暂无上传文档</div>';
+            }
+        } catch (error) {
+            console.error('加载用户文档失败:', error);
+            const container = document.getElementById('ai-user-documents-list');
+            if (container) {
+                container.innerHTML = '<div class="text-danger">加载文档失败</div>';
+            }
+        }
+    }
+
     // 为AI模式加载用户数据
     async loadUsersForAI() {
         try {
@@ -733,23 +987,30 @@ class EmailGenerator {
             const response = await Utils.apiRequest(`/api/users/${userId}/documents`);
             
             if (response && response.documents && response.documents.files && response.documents.files.length > 0) {
-                response.documents.files.forEach((file, index) => {
-                    const radioId = `doc-file-${file.id}`;
-                    const radioHtml = `
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="radio" name="doc-selected-file" id="${radioId}" value="${file.id}" onchange="handleDocumentSelectionChange()">
-                            <label class="form-check-label" for="${radioId}">
-                                <strong>${file.filename}</strong>
-                                <br>
-                                <small class="text-muted">
-                                    类型: ${file.file_type} | 大小: ${Utils.formatFileSize(file.file_size || 0)}
-                                    ${file.upload_time ? ' | 上传时间: ' + new Date(file.upload_time).toLocaleString() : ''}
-                                </small>
-                            </label>
-                        </div>
-                    `;
-                    container.innerHTML += radioHtml;
-                });
+                // 过滤只显示套磁信类型的文档
+                const coverLetterFiles = response.documents.files.filter(file => file.file_type === 'cover_letter');
+                
+                if (coverLetterFiles.length > 0) {
+                    coverLetterFiles.forEach((file, index) => {
+                        const radioId = `doc-file-${file.id}`;
+                        const radioHtml = `
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="doc-selected-file" id="${radioId}" value="${file.id}" onchange="handleDocumentSelectionChange()">
+                                <label class="form-check-label" for="${radioId}">
+                                    <strong>${file.filename}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        类型: ${file.file_type} | 大小: ${Utils.formatFileSize(file.file_size || 0)}
+                                        ${file.upload_time ? ' | 上传时间: ' + new Date(file.upload_time).toLocaleString() : ''}
+                                    </small>
+                                </label>
+                            </div>
+                        `;
+                        container.innerHTML += radioHtml;
+                    });
+                } else {
+                    container.innerHTML = '<div class="text-muted">该用户暂无套磁信文档</div>';
+                }
             } else {
                 container.innerHTML = '<div class="text-muted">该用户暂无上传文档</div>';
             }
@@ -785,11 +1046,17 @@ window.generateEmailForProfessor = (professorId) => window.EmailGenerator.genera
 window.handleAISenderChange = () => {
     const senderSelect = document.getElementById('ai-sender-user');
     const professorSelection = document.getElementById('ai-professor-selection');
+    const generationParams = document.getElementById('ai-generation-params');
     
     if (senderSelect && senderSelect.value) {
         // 显示教授选择部分
         if (professorSelection) {
             professorSelection.style.display = 'block';
+        }
+        
+        // 显示生成参数部分
+        if (generationParams) {
+            generationParams.style.display = 'block';
         }
         
         // 显示主题设置和操作按钮
@@ -799,10 +1066,20 @@ window.handleAISenderChange = () => {
         if (window.ProfessorManager && window.ProfessorManager.loadProfessorsForSelection) {
             window.ProfessorManager.loadProfessorsForSelection('ai-select-professor', 'ai-select-university');
         }
+        
+        // 加载用户自荐信文档
+        if (window.EmailGenerator && window.EmailGenerator.loadDocumentsForAI) {
+            window.EmailGenerator.loadDocumentsForAI(senderSelect.value);
+        }
     } else {
         // 隐藏教授选择部分
         if (professorSelection) {
             professorSelection.style.display = 'none';
+        }
+        
+        // 隐藏生成参数部分
+        if (generationParams) {
+            generationParams.style.display = 'none';
         }
         
         // 隐藏主题设置和操作按钮
@@ -888,21 +1165,17 @@ window.handleDocumentSelectionChange = () => {
 
 // 清除文档预览函数
 window.clearDocumentPreview = () => {
-    const previewContainer = document.getElementById('doc-document-content');
-    if (previewContainer) {
-        previewContainer.innerHTML = '';
-    }
-    
-    const documentCard = document.querySelector('.card:has(#doc-document-content)');
-    if (documentCard) {
-        documentCard.style.display = 'none';
+    const documentContentDiv = document.getElementById('doc-document-content');
+    if (documentContentDiv) {
+        documentContentDiv.innerHTML = '';
+        documentContentDiv.style.display = 'none';
     }
     
     // 重置文档选择
-    const documentSelect = document.getElementById('doc-select-document');
-    if (documentSelect) {
-        documentSelect.value = '';
-    }
+    const documentRadios = document.querySelectorAll('input[name="doc-selected-file"]');
+    documentRadios.forEach(radio => {
+        radio.checked = false;
+    });
 };
 
 // 发送方式选择函数
@@ -1060,7 +1333,7 @@ window.generateDocumentEmail = async () => {
                         </div>
                         <div class="mt-2">
                             <strong>内容:</strong>
-                            <div class="border p-3 mt-2" style="white-space: pre-wrap; max-height: 300px; overflow-y: auto;">${preview.content}</div>
+                            <div class="border p-3 mt-2" style="max-height: 300px; overflow-y: auto; padding: 15px; border: 1px solid #dee2e6; border-radius: 0.375rem; background-color: #fff; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.6; color: #333; word-wrap: break-word;">${preview.content}</div>
                         </div>
                     </div>
                 `;

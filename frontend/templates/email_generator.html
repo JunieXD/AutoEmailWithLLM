@@ -118,9 +118,11 @@
                             <div class="mb-4" id="ai-generation-params" style="display: none;">
                                 <h6 class="text-primary"><i class="bi bi-3-circle"></i> 生成参数</h6>
                                 <div class="mb-3">
-                                    <label for="ai-self-introduction" class="form-label">自我介绍 *</label>
-                                    <textarea class="form-control" id="ai-self-introduction" rows="6" 
-                                              placeholder="请输入您的学术背景、研究兴趣、相关经历等信息..." required></textarea>
+                                    <label class="form-label">自荐信选择 *</label>
+                                    <div id="ai-user-documents-list">
+                                        <div class="text-muted">请先选择发送用户</div>
+                                    </div>
+                                    <div class="form-text">选择当前发送用户已上传的自荐信文档，AI将根据自荐信内容结合教授研究方向生成个性化邮件</div>
                                 </div>
                                 <div class="mb-3">
                                     <label for="ai-additional-requirements" class="form-label">额外要求</label>
@@ -135,7 +137,7 @@
                                 <div id="ai-subject-container" class="mb-3">
                                     <label for="ai-email-subject" class="form-label">邮件主题 *</label>
                                     <input type="text" class="form-control" id="ai-email-subject" 
-                                           placeholder="请输入邮件主题，如：关于学术合作的咨询" required>
+                                           placeholder="请输入邮件主题" required>
                                     <div class="form-text">建议包含您的姓名或研究方向，让教授更容易识别</div>
                                 </div>
                             </div>
@@ -205,19 +207,7 @@
                                 </div>
                                 
                                 <!-- 文档预览 -->
-                                <div id="doc-document-preview" class="mt-3" style="display: none;">
-                                    <div class="card">
-                                        <div class="card-header d-flex justify-content-between align-items-center">
-                                            <h6 class="mb-0">文档预览</h6>
-                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearDocumentPreview()">
-                                                <i class="bi bi-x"></i> 清除
-                                            </button>
-                                        </div>
-                                        <div class="card-body">
-                                            <div id="doc-document-content" style="max-height: 300px; overflow-y: auto;"></div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <div id="doc-document-content" class="mt-3" style="display: none; max-height: 300px; overflow-y: auto; padding: 15px; border: 1px solid #dee2e6; border-radius: 0.375rem; background-color: #fff; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #000; word-wrap: break-word; overflow-wrap: break-word;"></div>
                             </div>
                             
                             <!-- 选择收件人教授 -->
@@ -274,7 +264,7 @@
                 <div id="doc-subject-container" class="mb-3">
                     <label for="doc-email-subject" class="form-label">邮件主题 *</label>
                     <input type="text" class="form-control" id="doc-email-subject" 
-                           placeholder="请输入邮件主题，如：关于学术合作的咨询" required>
+                           placeholder="请输入邮件主题" required>
                     <div class="form-text">建议包含您的姓名或研究方向，让教授更容易识别</div>
                 </div>
                 
@@ -333,6 +323,67 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 查看邮件内容模态框 -->
+    <div class="modal fade" id="viewEmailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-envelope-open"></i> 邮件内容</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-sm-3"><strong>邮件主题:</strong></div>
+                        <div class="col-sm-9" id="view-email-subject"></div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-3"><strong>收件人:</strong></div>
+                        <div class="col-sm-9" id="view-email-recipient"></div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-3"><strong>发送时间:</strong></div>
+                        <div class="col-sm-9" id="view-email-time"></div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-3"><strong>邮件内容:</strong></div>
+                        <div class="col-sm-9">
+                            <div id="view-email-content" class="border rounded p-3" style="white-space: pre-wrap; max-height: 400px; overflow-y: auto;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑邮件模态框 -->
+    <div class="modal fade" id="editEmailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> 编辑邮件</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit-email-subject" class="form-label">邮件主题</label>
+                        <input type="text" class="form-control" id="edit-email-subject">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-email-content" class="form-label">邮件内容</label>
+                        <textarea class="form-control" id="edit-email-content" rows="15"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="window.EmailGenerator.saveEditedEmail()">保存</button>
                 </div>
             </div>
         </div>
