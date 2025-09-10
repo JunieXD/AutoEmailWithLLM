@@ -36,11 +36,11 @@ function bindEventListeners() {
 // 加载当前设置
 function loadCurrentSettings() {
     // 加载数据库信息
-    fetch('/api/database/info')
+    fetch('/api/settings/database')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                document.getElementById('database-path').value = data.data.database_path || 'auto_email.db';
+                document.getElementById('database-path').value = data.data.db_file || 'auto_email.db';
                 document.getElementById('db-status').textContent = data.data.connection_status || '未知';
                 
                 // 根据连接状态设置样式
@@ -123,19 +123,26 @@ function testDatabaseConnection() {
     testBtn.disabled = true;
     testBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> 测试中...';
 
-    fetch('/api/database/test', {
-        method: 'POST'
-    })
+    fetch('/api/settings/database')
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showAlert('数据库连接测试成功', 'success');
-            // 更新连接状态
-            const statusElement = document.getElementById('db-status');
-            statusElement.textContent = '已连接';
-            statusElement.className = 'badge bg-success me-3';
+            const connectionStatus = data.data.connection_status;
+            if (connectionStatus === '已连接') {
+                showAlert('数据库连接测试成功', 'success');
+                // 更新连接状态
+                const statusElement = document.getElementById('db-status');
+                statusElement.textContent = '已连接';
+                statusElement.className = 'badge bg-success me-3';
+            } else {
+                showAlert('数据库连接测试失败: ' + connectionStatus, 'danger');
+                // 更新连接状态
+                const statusElement = document.getElementById('db-status');
+                statusElement.textContent = connectionStatus;
+                statusElement.className = 'badge bg-danger me-3';
+            }
         } else {
-            showAlert('数据库连接测试失败: ' + data.message, 'danger');
+            showAlert('数据库连接测试失败: ' + (data.error || '未知错误'), 'danger');
             // 更新连接状态
             const statusElement = document.getElementById('db-status');
             statusElement.textContent = '连接失败';

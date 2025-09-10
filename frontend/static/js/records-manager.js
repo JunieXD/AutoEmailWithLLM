@@ -23,6 +23,7 @@ class RecordsManager {
             this.displayEmailRecords(records);
             this.updateRecordsCount(records.length);
             this.populateUniversityFilter(records);
+            this.populateDepartmentFilter(records);
         } catch (error) {
             console.error('加载邮件记录失败:', error);
             Utils.showToast('加载邮件记录失败: ' + error.message, 'error');
@@ -119,10 +120,69 @@ class RecordsManager {
         });
     }
 
+    // 填充学院筛选选项
+    populateDepartmentFilter(records) {
+        const departmentSelect = document.getElementById('filter-department');
+        if (!departmentSelect) return;
+
+        const departments = [...new Set(records.map(r => r.professor_department).filter(d => d))].sort();
+        
+        // 保留默认选项
+        departmentSelect.innerHTML = '<option value="">所有学院</option>';
+        
+        departments.forEach(department => {
+            const option = document.createElement('option');
+            option.value = department;
+            option.textContent = department;
+            departmentSelect.appendChild(option);
+        });
+    }
+
+    // 学校选择变化时的处理
+    onUniversityChangeForRecords() {
+        const selectedUniversity = document.getElementById('filter-university')?.value || '';
+        this.updateDepartmentFilterByUniversity(selectedUniversity);
+        this.filterEmailRecords();
+    }
+
+    // 根据选择的学校更新学院选项
+    updateDepartmentFilterByUniversity(selectedUniversity) {
+        const departmentSelect = document.getElementById('filter-department');
+        if (!departmentSelect) return;
+
+        // 重置学院选择
+        departmentSelect.value = '';
+
+        if (!selectedUniversity) {
+            // 如果没有选择学校，显示所有学院
+            this.populateDepartmentFilter(this.allRecords);
+        } else {
+            // 根据选择的学校筛选学院
+            const filteredRecords = this.allRecords.filter(record => 
+                record.professor_university === selectedUniversity
+            );
+            this.populateDepartmentFilter(filteredRecords);
+        }
+    }
+
+    // 将HTML内容转换为纯文本
+    htmlToPlainText(html) {
+        // 创建一个临时的div元素
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        
+        // 获取纯文本内容
+        const plainText = tempDiv.textContent || tempDiv.innerText || '';
+        
+        // 清理多余的空白字符
+        return plainText.replace(/\s+/g, ' ').trim();
+    }
+
     // 筛选邮件记录
     filterEmailRecords() {
         const senderFilter = document.getElementById('filter-sender')?.value.toLowerCase() || '';
         const universityFilter = document.getElementById('filter-university')?.value || '';
+        const departmentFilter = document.getElementById('filter-department')?.value || '';
         const professorFilter = document.getElementById('filter-professor')?.value.toLowerCase() || '';
         const statusFilter = document.getElementById('filter-status')?.value || '';
         const dateFromFilter = document.getElementById('filter-date-from')?.value || '';
@@ -137,6 +197,11 @@ class RecordsManager {
 
             // 学校筛选
             if (universityFilter && record.professor_university !== universityFilter) {
+                return false;
+            }
+
+            // 学院筛选
+            if (departmentFilter && record.professor_department !== departmentFilter) {
                 return false;
             }
 
@@ -159,9 +224,16 @@ class RecordsManager {
                 return false;
             }
 
-            // 内容筛选
-            if (contentFilter && !record.subject.toLowerCase().includes(contentFilter)) {
-                return false;
+            // 内容筛选（搜索主题和邮件内容）
+            if (contentFilter) {
+                const subjectMatch = record.subject.toLowerCase().includes(contentFilter);
+                // 将HTML内容转换为纯文本进行搜索
+                const plainTextContent = this.htmlToPlainText(record.content || '').toLowerCase();
+                const contentMatch = plainTextContent.includes(contentFilter);
+                
+                if (!subjectMatch && !contentMatch) {
+                    return false;
+                }
             }
 
             return true;
@@ -175,11 +247,15 @@ class RecordsManager {
     clearEmailFilters() {
         document.getElementById('filter-sender').value = '';
         document.getElementById('filter-university').value = '';
+        document.getElementById('filter-department').value = '';
         document.getElementById('filter-professor').value = '';
         document.getElementById('filter-status').value = '';
         document.getElementById('filter-date-from').value = '';
         document.getElementById('filter-date-to').value = '';
         document.getElementById('filter-content').value = '';
+
+        // 重置学院选项为所有学院
+        this.populateDepartmentFilter(this.allRecords);
 
         this.filteredRecords = this.allRecords;
         this.displayEmailRecords(this.filteredRecords);
@@ -236,6 +312,10 @@ class RecordsManager {
                     <div class="row mb-3">
                         <div class="col-sm-3"><strong>学校:</strong></div>
                         <div class="col-sm-9">${record.professor_university}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-3"><strong>院系:</strong></div>
+                        <div class="col-sm-9">${record.professor_department || '未填写'}</div>
                     </div>
                     <div class="row mb-3">
                         <div class="col-sm-3"><strong>发送人:</strong></div>
@@ -341,5 +421,10 @@ function resendEmail(recordId) {
     }
 }
 
-// 创建全局实例
+function onUniversityChangeForRecords() {
+    if (window.RecordsManager) {
+        window.RecordsManager.onUniversityChangeForRecords();
+    }
+}
+
 window.RecordsManager = new RecordsManager();

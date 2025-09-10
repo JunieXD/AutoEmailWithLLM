@@ -204,7 +204,18 @@ def create_app():
                 for file_id in attachment_file_ids:
                     user_file = UserFile.query.filter_by(id=file_id, is_active=True).first()
                     if user_file and os.path.exists(user_file.file_path):
-                        attachments.append(user_file.file_path)
+                        # 生成显示名称
+                        display_name = user_file.file_name
+                        if user_file.file_type == 'resume':
+                            # 简历类型自动重命名为"简历-姓名"的格式
+                            name_part = os.path.splitext(user_file.file_name)[0]
+                            ext_part = os.path.splitext(user_file.file_name)[1]
+                            display_name = f"简历-{default_user.name}{ext_part}"
+                        
+                        attachments.append({
+                            'file_path': user_file.file_path,
+                            'display_name': display_name
+                        })
             
             # 发送邮件
             # 根据内容来源和格式确定邮件格式
@@ -291,17 +302,29 @@ def create_app():
             # 获取教授信息
             professors = []
             if batch_mode:
-                # 批量模式：根据学院查询所有教授
-                for dept_id in selected_professors:
-                    # 这里假设传递的是学院名称，需要根据学院查询教授
-                    dept_professors = Professor.query.filter_by(department=dept_id).all()
-                    for professor in dept_professors:
-                        professors.append({
-                            'name': professor.name,
-                            'university': professor.university,
-                            'department': professor.department,
-                            'research_area': professor.research_area
-                        })
+                # 批量模式：可能传递学院名称或教授ID
+                for item in selected_professors:
+                    # 尝试作为教授ID查询
+                    try:
+                        prof_id = int(item)
+                        professor = Professor.query.get(prof_id)
+                        if professor:
+                            professors.append({
+                                'name': professor.name,
+                                'university': professor.university,
+                                'department': professor.department,
+                                'research_area': professor.research_area
+                            })
+                    except (ValueError, TypeError):
+                        # 如果不是数字，则作为学院名称查询
+                        dept_professors = Professor.query.filter_by(department=item).all()
+                        for professor in dept_professors:
+                            professors.append({
+                                'name': professor.name,
+                                'university': professor.university,
+                                'department': professor.department,
+                                'research_area': professor.research_area
+                            })
             else:
                 # 单个模式：根据教授ID查询
                 for prof_id in selected_professors:
@@ -388,6 +411,7 @@ def create_app():
             'professor_name': r.professor.name,
             'professor_email': r.professor.email,
             'professor_university': r.professor.university,
+            'professor_department': r.professor.department,
             'subject': r.subject,
             'content': r.content,
             'status': r.status,
@@ -407,6 +431,7 @@ def create_app():
                 'professor_name': record.professor.name,
                 'professor_email': record.professor.email,
                 'professor_university': record.professor.university,
+                'professor_department': record.professor.department,
                 'subject': record.subject,
                 'content': record.content,
                 'status': record.status,
@@ -976,7 +1001,18 @@ def create_app():
                         for file_id in attachment_ids:
                             user_file = UserFile.query.filter_by(id=file_id, is_active=True).first()
                             if user_file and os.path.exists(user_file.file_path):
-                                attachments.append(user_file.file_path)
+                                # 生成显示名称
+                                display_name = user_file.file_name
+                                if user_file.file_type == 'resume':
+                                    # 简历类型自动重命名为"简历-姓名"的格式
+                                    name_part = os.path.splitext(user_file.file_name)[0]
+                                    ext_part = os.path.splitext(user_file.file_name)[1]
+                                    display_name = f"简历-{default_user.name}{ext_part}"
+                                
+                                attachments.append({
+                                    'file_path': user_file.file_path,
+                                    'display_name': display_name
+                                })
                     
                     # 发送邮件
                     sender_config = {

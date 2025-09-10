@@ -238,7 +238,8 @@ window.loadUserFilesForAttachment = async (userId) => {
                 const fileItem = document.createElement('div');
                 fileItem.className = 'form-check mb-2';
                 fileItem.innerHTML = `
-                    <input class="form-check-input" type="checkbox" value="${file.id}" id="attachment-${file.id}">
+                    <input class="form-check-input" type="checkbox" value="${file.id}" id="attachment-${file.id}" 
+                           data-filename="${file.filename}" data-filesize="${file.file_size}">
                     <label class="form-check-label d-flex justify-content-between align-items-center" for="attachment-${file.id}">
                         <div>
                             <i class="bi bi-file-earmark"></i>
@@ -334,11 +335,42 @@ window.generateDocumentEmail = async () => {
         
         if (isBatchMode) {
             const departmentSelect = document.getElementById('doc-select-department');
-            selectedProfessors = [departmentSelect.value]; // 批量模式使用学院ID
+            
+            // 检查是否选择了多个学院
+            if (departmentSelect.value === 'multiple') {
+                // 检查是否已经加载了教授列表（显示教授复选框）
+                const professorCheckboxes = document.querySelectorAll('.professor-checkbox:checked');
+                if (professorCheckboxes.length > 0) {
+                    // 如果有选中的教授复选框，使用教授ID
+                    selectedProfessors = Array.from(professorCheckboxes).map(cb => cb.value);
+                } else {
+                    // 如果没有教授复选框，检查学院复选框
+                    const selectedDepartmentCheckboxes = document.querySelectorAll('.department-checkbox:checked');
+                    if (selectedDepartmentCheckboxes.length === 0) {
+                        Utils.showToast('请至少选择一个学院', 'error');
+                        return;
+                    }
+                    selectedProfessors = Array.from(selectedDepartmentCheckboxes).map(cb => cb.value);
+                }
+            } else {
+                selectedProfessors = [departmentSelect.value]; // 单个学院
+            }
         } else {
             const professorSelect = document.getElementById('doc-select-professor');
             selectedProfessors = [professorSelect.value]; // 单个模式使用教授ID
         }
+        
+        // 获取选中的附件
+        const selectedAttachments = [];
+        const attachmentCheckboxes = document.querySelectorAll('#attachment-files-list input[type="checkbox"]:checked');
+        attachmentCheckboxes.forEach(checkbox => {
+            const fileInfo = {
+                file_id: checkbox.value,
+                file_name: checkbox.getAttribute('data-filename'),
+                file_size: checkbox.getAttribute('data-filesize')
+            };
+            selectedAttachments.push(fileInfo);
+        });
         
         const formData = {
             selected_documents: [documentRadio.value],
@@ -346,8 +378,12 @@ window.generateDocumentEmail = async () => {
             sender_id: senderSelect.value,
             custom_subject: subjectInput?.value || '',
             additional_content: additionalInput?.value || '',
-            batch_mode: isBatchMode
+            batch_mode: isBatchMode,
+            selected_attachments: selectedAttachments
         };
+        
+        // 将附件信息存储到全局变量中，供预览显示使用
+        window.currentSelectedAttachments = selectedAttachments;
         
         const response = await fetch('/api/generate-document-email', {
             method: 'POST',
@@ -416,7 +452,21 @@ function displayDocumentEmail(emailPreviews) {
                 <div class="mb-3">
                     <label class="form-label fw-bold">内容:</label>
                     <div class="document-content" style="min-height: 200px; max-height: 400px; overflow-y: auto;">${emailData.content || '无内容'}</div>
-                </div>` : `
+                </div>
+                ${window.currentSelectedAttachments && window.currentSelectedAttachments.length > 0 ? `
+                <div class="mb-3">
+                    <label class="form-label fw-bold">附件:</label>
+                    <div class="border rounded p-2 bg-light">
+                        ${window.currentSelectedAttachments.map(attachment => `
+                            <div class="d-flex align-items-center mb-1">
+                                <i class="bi bi-paperclip text-primary me-2"></i>
+                                <span class="me-2">${attachment.file_name}</span>
+                                <small class="text-muted">(${formatFileSize(parseInt(attachment.file_size))})</small>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>` : ''}
+                ` : `
                 <div class="mb-3">
                     <div class="alert alert-info mb-0">
                         <i class="bi bi-info-circle"></i> 点击"查看详情"按钮查看完整邮件内容

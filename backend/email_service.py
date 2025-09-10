@@ -76,11 +76,21 @@ class EmailService:
             
             # 添加文件路径附件
             if attachments:
-                for file_path in attachments:
-                    if os.path.isfile(file_path):
-                        self._add_attachment(message, file_path)
-                    else:
-                        logger.warning(f"附件文件不存在: {file_path}")
+                for attachment in attachments:
+                    if isinstance(attachment, str):
+                        # 兼容旧格式：直接传递文件路径
+                        if os.path.isfile(attachment):
+                            self._add_attachment(message, attachment)
+                        else:
+                            logger.warning(f"附件文件不存在: {attachment}")
+                    elif isinstance(attachment, dict):
+                        # 新格式：包含file_path和display_name的字典
+                        file_path = attachment.get('file_path')
+                        display_name = attachment.get('display_name')
+                        if file_path and os.path.isfile(file_path):
+                            self._add_attachment(message, file_path, display_name)
+                        else:
+                            logger.warning(f"附件文件不存在: {file_path}")
             
             # 添加base64编码的附件数据
             if attachment_data:
@@ -107,7 +117,7 @@ class EmailService:
             logger.error(f"邮件发送失败: {recipient_name} <{recipient_email}> - {str(e)}")
             return False
     
-    def _add_attachment(self, message: MIMEMultipart, file_path: str):
+    def _add_attachment(self, message: MIMEMultipart, file_path: str, display_name: str = None):
         """添加附件到邮件"""
         try:
             with open(file_path, "rb") as attachment:
@@ -116,7 +126,8 @@ class EmailService:
             
             encoders.encode_base64(part)
             
-            filename = os.path.basename(file_path)
+            # 使用显示名称，如果没有提供则使用文件名
+            filename = display_name if display_name else os.path.basename(file_path)
             part.add_header(
                 'Content-Disposition',
                 f'attachment; filename= {Header(filename, "utf-8").encode()}'

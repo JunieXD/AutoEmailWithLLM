@@ -20,10 +20,19 @@
                     </div>
                     <div class="col-md-3">
                         <label for="filter-university" class="form-label">学校</label>
-                        <select class="form-select" id="filter-university" onchange="filterEmailRecords()">
+                        <select class="form-select" id="filter-university" onchange="onUniversityChangeForRecords()">
                             <option value="">所有学校</option>
                         </select>
                     </div>
+                    <div class="col-md-3">
+                        <label for="filter-department" class="form-label">学院</label>
+                        <select class="form-select" id="filter-department" onchange="filterEmailRecords()">
+                            <option value="">所有学院</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
                     <div class="col-md-3">
                         <label for="filter-professor" class="form-label">教授</label>
                         <input type="text" class="form-control" id="filter-professor" placeholder="搜索教授姓名..." onkeyup="filterEmailRecords()">

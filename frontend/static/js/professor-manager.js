@@ -23,7 +23,7 @@ class ProfessorManager {
 
         const universityFilter = document.getElementById('universityFilter');
         if (universityFilter) {
-            universityFilter.addEventListener('change', this.filterProfessors.bind(this));
+            universityFilter.addEventListener('change', this.onUniversityChange.bind(this));
         }
 
         const departmentFilter = document.getElementById('departmentFilter');
@@ -76,7 +76,11 @@ class ProfessorManager {
             
             // 更新筛选选项
             this.updateUniversityFilter();
-            this.updateDepartmentFilter();
+            // 只有在没有选择学校时才更新院系选项
+            const universityFilter = document.getElementById('universityFilter');
+            if (!universityFilter || !universityFilter.value) {
+                this.updateDepartmentFilter();
+            }
             
             // 显示教授列表
             this.displayProfessors(professors);
@@ -115,24 +119,7 @@ class ProfessorManager {
         try {
             const professors = await Utils.apiRequest('/api/professors');
             
-            // 检查是否为AI生成模式，如果是则过滤掉没有研究方向的教授
-            let filteredProfessors = professors;
-            let excludedCount = 0;
-            
-            if (professorSelectId && (professorSelectId.includes('ai-') || professorSelectId.includes('ai_'))) {
-                filteredProfessors = professors.filter(prof => {
-                    const hasResearchArea = prof.research_area && prof.research_area.trim() !== '';
-                    if (!hasResearchArea) {
-                        excludedCount++;
-                    }
-                    return hasResearchArea;
-                });
-                
-                // 如果有教授被过滤掉，显示提醒
-                if (excludedCount > 0) {
-                    Utils.showToast(`注意：已过滤掉 ${excludedCount} 位没有研究方向信息的教授，AI生成功能需要教授的研究方向信息`, 'warning');
-                }
-            }
+            const filteredProfessors = professors;
             
             // 加载教授选择框
             const professorSelect = document.getElementById(professorSelectId);
@@ -300,23 +287,7 @@ class ProfessorManager {
         
         let filteredProfessors = professors.filter(prof => departments.includes(prof.department));
         
-        // 如果是AI生成模式，过滤掉没有研究方向的教授
-        let excludedCount = 0;
-        if (professorListId && professorListId.includes('ai-')) {
-            const originalCount = filteredProfessors.length;
-            filteredProfessors = filteredProfessors.filter(prof => {
-                const hasResearchArea = prof.research_area && prof.research_area.trim() !== '';
-                if (!hasResearchArea) {
-                    excludedCount++;
-                }
-                return hasResearchArea;
-            });
-            
-            // 如果有教授被过滤掉，显示提醒
-            if (excludedCount > 0) {
-                Utils.showToast(`注意：已过滤掉 ${excludedCount} 位没有研究方向信息的教授，AI生成功能需要教授的研究方向信息`, 'warning');
-            }
-        }
+        // 过滤教授按学院
         
         if (filteredProfessors.length === 0) {
             professorList.innerHTML = '<p class="text-muted">该学院暂无教授数据</p>';
@@ -462,6 +433,45 @@ class ProfessorManager {
         }
     }
 
+    // 学校选择变化时的处理
+    onUniversityChange() {
+        this.updateDepartmentFilterByUniversity();
+        this.filterProfessors();
+    }
+
+    // 根据选择的学校更新院系筛选选项
+    updateDepartmentFilterByUniversity() {
+        const universityFilter = document.getElementById('universityFilter')?.value || '';
+        const departmentSelect = document.getElementById('departmentFilter');
+        
+        if (!departmentSelect) return;
+        
+        // 清空当前选择
+        departmentSelect.value = '';
+        
+        if (!universityFilter) {
+            // 如果没有选择学校，显示所有院系
+            this.updateDepartmentFilter();
+            return;
+        }
+        
+        // 获取选定学校的所有院系
+        const departments = [...new Set(window.AppGlobals.allProfessors
+            .filter(p => p.university === universityFilter)
+            .map(p => p.department)
+            .filter(d => d && d.trim() !== '')
+        )].sort();
+        
+        departmentSelect.innerHTML = '<option value="">所有院系</option>';
+        
+        departments.forEach(dept => {
+            const option = document.createElement('option');
+            option.value = dept;
+            option.textContent = dept;
+            departmentSelect.appendChild(option);
+        });
+    }
+
     // 搜索和筛选教授
     filterProfessors() {
         const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
@@ -488,6 +498,8 @@ class ProfessorManager {
         document.getElementById('searchInput').value = '';
         document.getElementById('universityFilter').value = '';
         document.getElementById('departmentFilter').value = '';
+        // 重置院系选项为所有院系
+        this.updateDepartmentFilter();
         this.displayProfessors(window.AppGlobals.allProfessors);
     }
 
