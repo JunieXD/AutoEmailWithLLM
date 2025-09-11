@@ -1,7 +1,7 @@
 [project]
-name = "autoemailwithllm"
-version = "0.1.0"
-description = "Add your description here"
+name = "AutoEmailSender"
+version = "1.1.0"
+description = "A tool for automatically sending emails"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

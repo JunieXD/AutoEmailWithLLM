@@ -1,4 +1,4 @@
-# AutoEmailWithLLM
+# AutoEmailSender
 
 一个基于 Flask 的「教授信息管理 + 邮件发送」的轻量级应用。支持通过 DOCX 文档模板快速个性化生成邮件、CSV 批量导入教授信息、管理发件人配置与用户资料，并记录发送历史。
 
@@ -19,7 +19,7 @@
 
 ## 目录结构
 ```
-AutoEmailWithLLM/
+AutoEmailSender/
 ├── app.py                       # Flask 入口 & 路由
 ├── init_database.py             # 数据库初始化脚本
 ├── backend/
