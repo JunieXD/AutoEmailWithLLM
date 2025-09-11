@@ -498,7 +498,7 @@ function displayDocumentEmail(emailPreviews) {
     const html = `
         <div class="mb-3">
             <div class="alert alert-info">
-                <i class="bi bi-info-circle"></i> 共生成 ${emailPreviews.length} 封邮件预览，但仅展示一封
+                <i class="bi bi-info-circle"></i> 共生成 ${emailPreviews.length} 封邮件预览，仅展示一封
             </div>
             ${emailsHtml}
         </div>

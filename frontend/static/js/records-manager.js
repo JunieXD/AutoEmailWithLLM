@@ -118,8 +118,8 @@ class RecordsManager {
                               record.status === 'failed' ? '发送失败' : '待发送';
             
             const sentTime = record.sent_at ? 
-                new Date(record.sent_at).toLocaleString('zh-CN') : 
-                new Date(record.created_at).toLocaleString('zh-CN');
+                Utils.formatDateTime(record.sent_at) : 
+                Utils.formatDateTime(record.created_at);
 
             html += `
                 <div class="card mb-3">
@@ -407,7 +407,7 @@ class RecordsManager {
             }
 
             // 日期筛选
-            const recordDate = new Date(record.sent_at || record.created_at).toISOString().split('T')[0];
+            const recordDate = new Date(record.sent_at || record.created_at).toLocaleDateString('en-CA'); // 使用本地时区的日期，格式为YYYY-MM-DD
             if (dateFromFilter && recordDate < dateFromFilter) {
                 return false;
             }
@@ -534,7 +534,7 @@ class RecordsManager {
                     </div>
                     <div class="row mb-3">
                         <div class="col-sm-3"><strong>发送时间:</strong></div>
-                        <div class="col-sm-9">${record.sent_at ? new Date(record.sent_at).toLocaleString('zh-CN') : '未发送'}</div>
+                        <div class="col-sm-9">${record.sent_at ? Utils.formatDateTime(record.sent_at) : '未发送'}</div>
                     </div>
                     <div class="row mb-3">
                         <div class="col-sm-3"><strong>邮件内容:</strong></div>

@@ -412,7 +412,7 @@ function displayUsers(userList) {
                     </div>
                 </div>
                 <div class="card-footer text-muted small">
-                    创建时间: ${new Date(user.created_at).toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}
+                    创建时间: ${Utils.formatDateTime(user.created_at)}
                 </div>
             </div>
         </div>

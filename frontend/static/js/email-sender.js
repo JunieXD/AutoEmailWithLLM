@@ -723,7 +723,7 @@ class EmailSender {
                                 <p class="card-text">
                                     <i class="bi bi-person"></i> 收件人: ${record.recipient_name || record.recipient_email}<br>
                                     <i class="bi bi-envelope"></i> 邮箱: ${record.recipient_email}<br>
-                                    <i class="bi bi-clock"></i> 发送时间: ${new Date(record.send_time).toLocaleString()}
+                                    <i class="bi bi-clock"></i> 发送时间: ${Utils.formatDateTime(record.send_time)}
                                 </p>
                             </div>
                             <div class="col-md-4 text-end">
@@ -757,7 +757,7 @@ class EmailSender {
             
             document.getElementById('view-email-subject').textContent = record.subject;
             document.getElementById('view-email-recipient').textContent = record.recipient_email;
-            document.getElementById('view-email-time').textContent = new Date(record.send_time).toLocaleString();
+            document.getElementById('view-email-time').textContent = Utils.formatDateTime(record.send_time);
             document.getElementById('view-email-content').innerHTML = record.content || '无内容';
             
             modal.show();

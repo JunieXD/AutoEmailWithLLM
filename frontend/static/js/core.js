@@ -335,9 +335,67 @@ class Utils {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    // 格式化日期时间
-    static formatDateTime(dateString) {
-        return new Date(dateString).toLocaleString('zh-CN');
+    // 格式化日期时间 - 使用用户本地时区
+    static formatDateTime(dateString, options = {}) {
+        if (!dateString) return '未知时间';
+        
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '无效时间';
+        
+        // 默认格式化选项
+        const defaultOptions = {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        };
+        
+        // 合并用户提供的选项
+        const formatOptions = { ...defaultOptions, ...options };
+        
+        // 使用用户浏览器的本地时区和语言设置
+        return date.toLocaleString(navigator.language || 'zh-CN', formatOptions);
+    }
+    
+    // 格式化日期时间（简短版本）
+    static formatDateTimeShort(dateString) {
+        return this.formatDateTime(dateString, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+    }
+    
+    // 格式化相对时间（如：2小时前）
+    static formatRelativeTime(dateString) {
+        if (!dateString) return '未知时间';
+        
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '无效时间';
+        
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        
+        if (diffMinutes < 1) {
+            return '刚刚';
+        } else if (diffMinutes < 60) {
+            return `${diffMinutes}分钟前`;
+        } else if (diffHours < 24) {
+            return `${diffHours}小时前`;
+        } else if (diffDays < 7) {
+            return `${diffDays}天前`;
+        } else {
+            return this.formatDateTimeShort(dateString);
+        }
     }
 
     // 获取状态文本
