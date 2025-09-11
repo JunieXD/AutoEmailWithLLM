@@ -143,6 +143,8 @@ def create_app():
         """邮件生成页面"""
         return render_template('email_generator.html')
     
+
+    
     @app.route('/api/professors', methods=['GET', 'POST'])
     def professors():
         """教授信息管理"""

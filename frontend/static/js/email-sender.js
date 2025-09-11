@@ -57,9 +57,13 @@ class EmailSender {
         try {
             const result = await this.sendSingleEmail(formData);
             this.handleSendResult(result, 'single');
+            if (result && result.success) {
+                this.showSuccessThenRestore('single');
+            } else {
+                this.hideSendingState('single');
+            }
         } catch (error) {
             Utils.showToast('邮件发送失败: ' + error.message, 'error');
-        } finally {
             this.hideSendingState('single');
         }
     }
@@ -79,9 +83,13 @@ class EmailSender {
         try {
             const result = await this.sendBatchEmails(formData);
             this.handleBatchSendResult(result);
+            if (result && (!result.failed_count || result.failed_count === 0)) {
+                this.showSuccessThenRestore('batch');
+            } else {
+                this.hideSendingState('batch');
+            }
         } catch (error) {
             Utils.showToast('批量邮件发送失败: ' + error.message, 'error');
-        } finally {
             this.hideSendingState('batch');
         }
     }
@@ -101,9 +109,13 @@ class EmailSender {
         try {
             const result = await this.sendDocumentEmails(formData);
             this.handleBatchSendResult(result);
+            if (result && (!result.failed_count || result.failed_count === 0)) {
+                this.showSuccessThenRestore('document');
+            } else {
+                this.hideSendingState('document');
+            }
         } catch (error) {
             Utils.showToast('文档邮件发送失败: ' + error.message, 'error');
-        } finally {
             this.hideSendingState('document');
         }
     }
@@ -391,10 +403,14 @@ class EmailSender {
 
     // 显示发送中状态
     showSendingState(type) {
-        const sendBtn = document.querySelector(`#${type}-email-form button[type="submit"]`);
+        const sendBtn = this.getSendButton(type);
         if (sendBtn) {
             sendBtn.disabled = true;
-            sendBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> 发送中...';
+            // 记录原始HTML，用于恢复
+            if (!sendBtn.dataset.originalHtml) {
+                sendBtn.dataset.originalHtml = sendBtn.innerHTML;
+            }
+            sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>发送中...';
         }
         
         // 显示进度条
@@ -406,10 +422,11 @@ class EmailSender {
 
     // 隐藏发送中状态
     hideSendingState(type) {
-        const sendBtn = document.querySelector(`#${type}-email-form button[type="submit"]`);
+        const sendBtn = this.getSendButton(type);
         if (sendBtn) {
             sendBtn.disabled = false;
-            sendBtn.innerHTML = '<i class="bi bi-send"></i> 发送邮件';
+            const original = sendBtn.dataset.originalHtml || '<i class="bi bi-send"></i> 发送邮件';
+            sendBtn.innerHTML = original;
         }
         
         // 隐藏进度条
@@ -417,6 +434,52 @@ class EmailSender {
         if (progressContainer) {
             progressContainer.style.display = 'none';
         }
+    }
+
+    // 新增：根据类型获取发送按钮（兼容文档模式按钮不在 form 内）
+    getSendButton(type) {
+        if (type === 'document') {
+            const btn = document.getElementById('doc-send-email-btn');
+            if (btn) return btn;
+        }
+        if (type === 'single') {
+            const form = document.getElementById('single-email-form');
+            if (form) {
+                const btn = form.querySelector('button[type="submit"]') 
+                         || form.querySelector('button[id*="single"][id*="send"]')
+                         || form.querySelector('.btn-primary');
+                if (btn) return btn;
+            }
+        }
+        if (type === 'batch') {
+            const form = document.getElementById('batch-email-form');
+            if (form) {
+                const btn = form.querySelector('button[type="submit"]') 
+                         || form.querySelector('button[id*="batch"][id*="send"]')
+                         || form.querySelector('.btn-primary');
+                if (btn) return btn;
+            }
+        }
+        return null;
+    }
+
+    // 新增：显示“发送成功”后延时恢复按钮文案和可点击状态
+    async showSuccessThenRestore(type, delayMs = 1500) {
+        const sendBtn = this.getSendButton(type);
+        if (sendBtn) {
+            // 保持禁用，避免用户在过渡期重复点击
+            sendBtn.disabled = true;
+            // originalHtml 已在 showSendingState 中记录
+            sendBtn.innerHTML = '<i class="bi bi-check2-circle"></i> 发送成功';
+        }
+        // 进度条此时应隐藏
+        const progressContainer = document.getElementById(`${type}-progress`);
+        if (progressContainer) {
+            progressContainer.style.display = 'none';
+        }
+        // 等待一段时间后恢复原始状态
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        this.hideSendingState(type);
     }
 
     // 处理发送结果

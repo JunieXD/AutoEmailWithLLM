@@ -516,22 +516,9 @@ function resetForm() {
     updateFilesDisplay();
 }
 
-// 显示提示信息
+// 显示提示信息（已弃用，使用Utils.showToast代替）
 function showAlert(message, type) {
-    const alertContainer = document.createElement('div');
-    alertContainer.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-    alertContainer.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
-    alertContainer.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    
-    document.body.appendChild(alertContainer);
-    
-    // 3秒后自动移除
-    setTimeout(() => {
-        if (alertContainer.parentNode) {
-            alertContainer.remove();
-        }
-    }, 3000);
+    // 将老版Alert调用转换为新版Toast
+    const toastType = type === 'danger' ? 'error' : type;
+    Utils.showToast(message, toastType);
 }

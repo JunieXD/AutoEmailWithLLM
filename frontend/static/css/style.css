@@ -554,15 +554,136 @@ body {
 }
 
 /* Toast 通知样式 */
+.toast-container {
+    z-index: 9999;
+    max-width: 350px;
+}
+
 .toast {
     border: none;
-    border-radius: var(--border-radius);
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(10px);
+    margin-bottom: 0.75rem;
+    min-width: 300px;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast.hiding {
+    opacity: 0;
+    transform: translateX(100%);
 }
 
 .toast-header {
     background-color: var(--light-color);
     border-bottom: 1px solid #dee2e6;
+    border-radius: 12px 12px 0 0;
+    padding: 0.75rem 1rem;
+}
+
+.toast-body {
+    padding: 1rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Toast 图标样式 */
+.toast-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.toast-icon.success {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.toast-icon.error {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.toast-icon.warning {
+    background-color: rgba(0, 0, 0, 0.1);
+    color: #000;
+}
+
+.toast-icon.info {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+/* Toast 类型样式 */
+.toast.bg-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    border-left: 4px solid #1e7e34;
+}
+
+.toast.bg-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
+    border-left: 4px solid #bd2130;
+}
+
+.toast.bg-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #ffeb3b 100%);
+    border-left: 4px solid #d39e00;
+    color: #000 !important;
+}
+
+.toast.bg-primary {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    border-left: 4px solid #0056b3;
+}
+
+.toast.bg-warning .toast-body {
+    color: #000;
+}
+
+.toast.bg-warning .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* 关闭按钮样式 */
+.toast .btn-close {
+    background-size: 0.75em;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.toast .btn-close:hover {
+    opacity: 1;
+}
+
+/* 响应式设计 */
+@media (max-width: 576px) {
+    .toast-container {
+        left: 1rem;
+        right: 1rem;
+        top: 1rem !important;
+        max-width: none;
+    }
+    
+    .toast {
+        min-width: auto;
+        width: 100%;
+    }
 }
 
 /* 滚动条样式 */

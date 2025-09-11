@@ -264,66 +264,157 @@ class AppCore {
 // 通用工具函数
 class Utils {
     // 显示Toast提示
-    static showToast(message, type = 'info') {
+    static showToast(message, type = 'info', options = {}) {
+        // 默认选项
+        const defaultOptions = {
+            duration: 3000,
+            closable: true,
+            position: 'top-right'
+        };
+        const config = { ...defaultOptions, ...options };
+        
         // 创建toast容器（如果不存在）
         let toastContainer = document.getElementById('toast-container');
         if (!toastContainer) {
             toastContainer = document.createElement('div');
             toastContainer.id = 'toast-container';
-            toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+            toastContainer.className = `toast-container position-fixed ${Utils.getToastPositionClass(config.position)} p-3`;
             toastContainer.style.zIndex = '9999';
             document.body.appendChild(toastContainer);
         }
         
+        // 限制同时显示的toast数量
+        const existingToasts = toastContainer.querySelectorAll('.toast');
+        if (existingToasts.length >= 5) {
+            // 移除最旧的toast
+            const oldestToast = existingToasts[0];
+            Utils.hideToast(oldestToast);
+        }
+        
+        // 获取图标和颜色类
+        const iconInfo = Utils.getToastIcon(type);
+        const colorClass = Utils.getToastColorClass(type);
+        
         // 创建toast元素
-        const toastId = 'toast-' + Date.now();
+        const toastId = 'toast-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         const toastHtml = `
-            <div id="${toastId}" class="toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'error' ? 'danger' : type === 'warning' ? 'warning' : 'primary'}" role="alert">
+            <div id="${toastId}" class="toast align-items-center text-white ${colorClass}" role="alert" aria-live="assertive" aria-atomic="true">
                 <div class="d-flex">
                     <div class="toast-body">
-                        ${message}
+                        <div class="toast-icon ${type}">
+                            ${iconInfo.icon}
+                        </div>
+                        <span class="toast-message">${message}</span>
                     </div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    ${config.closable ? '<button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="关闭"></button>' : ''}
                 </div>
             </div>
         `;
         
         toastContainer.insertAdjacentHTML('beforeend', toastHtml);
         
-        // 显示toast
+        // 获取toast元素并设置事件
         const toastElement = document.getElementById(toastId);
-        const toast = new bootstrap.Toast(toastElement, {
-            autohide: true,
-            delay: 3000
-        });
-        toast.show();
         
-        // 自动清理
-        toastElement.addEventListener('hidden.bs.toast', function() {
-            toastElement.remove();
-        });
+        // 添加关闭按钮事件
+        if (config.closable) {
+            const closeBtn = toastElement.querySelector('.btn-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    Utils.hideToast(toastElement);
+                });
+            }
+        }
+        
+        // 显示toast with animation
+        setTimeout(() => {
+            toastElement.classList.add('show');
+        }, 10);
+        
+        // 自动隐藏
+        if (config.duration > 0) {
+            setTimeout(() => {
+                Utils.hideToast(toastElement);
+            }, config.duration);
+        }
+        
+        return toastElement;
+    }
+    
+    // 隐藏Toast
+    static hideToast(toastElement) {
+        if (!toastElement || toastElement.classList.contains('hiding')) {
+            return;
+        }
+        
+        toastElement.classList.add('hiding');
+        toastElement.classList.remove('show');
+        
+        // 等待动画完成后移除元素
+        setTimeout(() => {
+            if (toastElement && toastElement.parentNode) {
+                toastElement.remove();
+            }
+        }, 300);
+    }
+    
+    // 获取Toast位置类
+    static getToastPositionClass(position) {
+        switch (position) {
+            case 'top-left':
+                return 'top-0 start-0';
+            case 'top-center':
+                return 'top-0 start-50 translate-middle-x';
+            case 'top-right':
+            default:
+                return 'top-0 end-0';
+            case 'bottom-left':
+                return 'bottom-0 start-0';
+            case 'bottom-center':
+                return 'bottom-0 start-50 translate-middle-x';
+            case 'bottom-right':
+                return 'bottom-0 end-0';
+        }
+    }
+    
+    // 获取Toast图标
+    static getToastIcon(type) {
+        const icons = {
+            success: { icon: '✓', label: '成功' },
+            error: { icon: '✕', label: '错误' },
+            warning: { icon: '⚠', label: '警告' },
+            info: { icon: 'ⓘ', label: '信息' }
+        };
+        return icons[type] || icons.info;
+    }
+    
+    // 获取Toast颜色类
+    static getToastColorClass(type) {
+        const colorMap = {
+            success: 'bg-success',
+            error: 'bg-danger',
+            warning: 'bg-warning',
+            info: 'bg-primary'
+        };
+        return colorMap[type] || colorMap.info;
+    }
+    
+    // 清除所有Toast
+    static clearAllToasts() {
+        const toastContainer = document.getElementById('toast-container');
+        if (toastContainer) {
+            const toasts = toastContainer.querySelectorAll('.toast');
+            toasts.forEach(toast => {
+                Utils.hideToast(toast);
+            });
+        }
     }
 
-    // 显示Alert提示
+    // 显示Alert提示（已弃用，使用showToast代替）
     static showAlert(message, type = 'info') {
-        // 创建提示框
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        
-        // 添加到页面
-        document.body.appendChild(alertDiv);
-        
-        // 自动移除
-        setTimeout(() => {
-            if (alertDiv.parentNode) {
-                alertDiv.remove();
-            }
-        }, 5000);
+        // 将老版Alert调用转换为新版Toast
+        const toastType = type === 'danger' ? 'error' : type;
+        Utils.showToast(message, toastType);
     }
 
     // 格式化文件大小

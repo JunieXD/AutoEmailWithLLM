@@ -187,24 +187,9 @@ function testDatabaseConnection() {
     });
 }
 
-// 显示提示信息
+// 显示提示信息（已弃用，使用Utils.showToast代替）
 function showAlert(message, type) {
-    // 创建提示框
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    
-    // 插入到页面顶部
-    const container = document.querySelector('.container');
-    container.insertBefore(alertDiv, container.firstChild);
-    
-    // 3秒后自动消失
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.remove();
-        }
-    }, 3000);
+    // 将老版Alert调用转换为新版Toast
+    const toastType = type === 'danger' ? 'error' : type;
+    Utils.showToast(message, toastType);
 }
