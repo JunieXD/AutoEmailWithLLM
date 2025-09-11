@@ -431,7 +431,7 @@ class RecordsManager {
         });
 
         this.displayEmailRecords(this.filteredRecords);
-        this.updateRecordsCount(this.filteredRecords.length);
+        this.updatePaginationInfo();
     }
 
     // 清除筛选条件
