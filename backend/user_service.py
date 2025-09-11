@@ -44,10 +44,21 @@ class UserService:
             os.makedirs(user_folder, exist_ok=True)
             
             # 生成安全的文件名
-            filename = secure_filename(file.filename)
+            original_filename = file.filename
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            name, ext = os.path.splitext(filename)
-            new_filename = f'{file_type}_{timestamp}{ext}'
+            
+            # 获取原始文件的扩展名
+            _, ext = os.path.splitext(original_filename)
+            
+            # 使用secure_filename处理文件名，但如果结果为空，则使用file_type作为基础名
+            secure_name = secure_filename(original_filename)
+            if not secure_name or not secure_name.strip():
+                # 如果secure_filename返回空字符串（通常是因为中文字符被移除），使用file_type
+                new_filename = f'{file_type}_{timestamp}{ext}'
+            else:
+                # 如果secure_filename有效，使用处理后的名称
+                name, _ = os.path.splitext(secure_name)
+                new_filename = f'{file_type}_{timestamp}{ext}'
             
             file_path = os.path.join(user_folder, new_filename)
             file.save(file_path)
