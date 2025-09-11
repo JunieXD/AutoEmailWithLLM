@@ -17,13 +17,13 @@ class EmailService:
     
     def __init__(self):
         self.smtp_servers = {
-            '163.com': {'server': 'smtp.163.com', 'port': 25},
+            '163.com': {'server': 'smtp.163.com', 'port': 465},
             'qq.com': {'server': 'smtp.qq.com', 'port': 587},
             'gmail.com': {'server': 'smtp.gmail.com', 'port': 587},
             'outlook.com': {'server': 'smtp-mail.outlook.com', 'port': 587},
             'sina.com': {'server': 'smtp.sina.com', 'port': 25}
         }
-    
+
     def get_smtp_config(self, email: str) -> Dict[str, any]:
         """根据邮箱地址获取SMTP配置"""
         domain = email.split('@')[1].lower()
@@ -58,8 +58,18 @@ class EmailService:
             bool: 发送是否成功
         """
         try:
-            # 获取SMTP配置
-            smtp_config = self.get_smtp_config(sender_config['email'])
+            # 计算SMTP配置，优先使用用户在sender_config中配置的服务器与端口
+            default_cfg = self.get_smtp_config(sender_config['email'])
+            smtp_server = (sender_config.get('smtp_server') or default_cfg['server']).strip()
+            smtp_port = int(sender_config.get('smtp_port') or default_cfg['port'])
+            use_ssl = bool(sender_config.get('use_ssl')) or smtp_port == 465
+            use_starttls = bool(sender_config.get('use_starttls')) or (smtp_port == 587 and not use_ssl)
+
+            logger.info(
+                f"准备发送邮件: to={recipient_name} <{recipient_email}>, "
+                f"server={smtp_server}, port={smtp_port}, "
+                f"security={'SSL' if use_ssl else ('STARTTLS' if use_starttls else 'PLAIN')}"
+            )
             
             # 创建邮件对象
             message = MIMEMultipart()
@@ -97,46 +107,61 @@ class EmailService:
                 for attachment in attachment_data:
                     self._add_attachment_from_data(message, attachment)
             
-            # 发送邮件
-            with smtplib.SMTP(smtp_config['server'], smtp_config['port']) as smtp_obj:
-                # 如果端口是587，启用TLS
-                if smtp_config['port'] == 587:
-                    smtp_obj.starttls()
-                
-                smtp_obj.login(sender_config['email'], sender_config['password'])
-                smtp_obj.sendmail(
-                    sender_config['email'], 
-                    recipient_email, 
-                    message.as_string()
-                )
+            # 发送邮件：根据端口/配置自动选择SSL或STARTTLS
+            if use_ssl:
+                with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30) as smtp_obj:
+                    smtp_obj.login(sender_config['email'], sender_config['password'])
+                    smtp_obj.sendmail(
+                        sender_config['email'], 
+                        recipient_email, 
+                        message.as_string()
+                    )
+            else:
+                with smtplib.SMTP(smtp_server, smtp_port, timeout=30) as smtp_obj:
+                    if use_starttls:
+                        smtp_obj.starttls()
+                    smtp_obj.login(sender_config['email'], sender_config['password'])
+                    smtp_obj.sendmail(
+                        sender_config['email'], 
+                        recipient_email, 
+                        message.as_string()
+                    )
             
             logger.info(f"邮件发送成功: {recipient_name} <{recipient_email}>")
             return True
             
         except Exception as e:
-            logger.error(f"邮件发送失败: {recipient_name} <{recipient_email}> - {str(e)}")
+            logger.error(
+                f"邮件发送失败: {recipient_name} <{recipient_email}> - {e!r}"
+            )
             return False
-    
-    def _add_attachment(self, message: MIMEMultipart, file_path: str, display_name: str = None):
+
+    def _add_attachment(self, message: MIMEMultipart, file_path: str, display_name: Optional[str] = None):
         """添加附件到邮件"""
         try:
-            with open(file_path, "rb") as attachment:
+            # 读取文件内容
+            with open(file_path, 'rb') as file:
                 part = MIMEBase('application', 'octet-stream')
-                part.set_payload(attachment.read())
+                part.set_payload(file.read())
             
+            # 编码附件
             encoders.encode_base64(part)
             
-            # 使用显示名称，如果没有提供则使用文件名
-            filename = display_name if display_name else os.path.basename(file_path)
+            # 获取文件名
+            filename = display_name or os.path.basename(file_path)
+            
+            # 设置附件头信息
             part.add_header(
                 'Content-Disposition',
                 f'attachment; filename= {Header(filename, "utf-8").encode()}'
             )
+            
             message.attach(part)
+            logger.info(f"成功添加附件: {filename}")
             
         except Exception as e:
             logger.error(f"添加附件失败: {file_path} - {str(e)}")
-    
+
     def _add_attachment_from_data(self, message: MIMEMultipart, attachment_info: Dict[str, any]):
         """从base64数据添加附件到邮件"""
         try:
@@ -168,7 +193,7 @@ class EmailService:
             
         except Exception as e:
             logger.error(f"添加base64附件失败: {attachment_info.get('filename', 'unknown')} - {str(e)}")
-    
+
     def send_batch_emails(self, 
                          email_list: List[Dict],
                          sender_config: Dict[str, str],
@@ -215,7 +240,7 @@ class EmailService:
         
         logger.info(f"批量邮件发送完成: 成功 {stats['success']} 封，失败 {stats['failed']} 封")
         return stats
-    
+
     def validate_email_config(self, sender_config: Dict[str, str]) -> bool:
         """
         验证邮件配置是否有效
@@ -233,21 +258,34 @@ class EmailService:
                     logger.error(f"邮件配置缺少必要字段: {field}")
                     return False
             
-            # 尝试连接SMTP服务器
-            smtp_config = self.get_smtp_config(sender_config['email'])
+            # 计算SMTP配置（优先使用用户自定义）
+            default_cfg = self.get_smtp_config(sender_config['email'])
+            smtp_server = (sender_config.get('smtp_server') or default_cfg['server']).strip()
+            smtp_port = int(sender_config.get('smtp_port') or default_cfg['port'])
+            use_ssl = bool(sender_config.get('use_ssl')) or smtp_port == 465
+            use_starttls = bool(sender_config.get('use_starttls')) or (smtp_port == 587 and not use_ssl)
+
+            logger.info(
+                f"验证邮件配置: server={smtp_server}, port={smtp_port}, "
+                f"security={'SSL' if use_ssl else ('STARTTLS' if use_starttls else 'PLAIN')}"
+            )
             
-            with smtplib.SMTP(smtp_config['server'], smtp_config['port']) as smtp_obj:
-                if smtp_config['port'] == 587:
-                    smtp_obj.starttls()
-                smtp_obj.login(sender_config['email'], sender_config['password'])
+            if use_ssl:
+                with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=15) as smtp_obj:
+                    smtp_obj.login(sender_config['email'], sender_config['password'])
+            else:
+                with smtplib.SMTP(smtp_server, smtp_port, timeout=15) as smtp_obj:
+                    if use_starttls:
+                        smtp_obj.starttls()
+                    smtp_obj.login(sender_config['email'], sender_config['password'])
             
             logger.info(f"邮件配置验证成功: {sender_config['email']}")
             return True
             
         except Exception as e:
-            logger.error(f"邮件配置验证失败: {str(e)}")
+            logger.error(f"邮件配置验证失败: {e!r}")
             return False
-    
+
     def create_html_content(self, template_content: str, replacements: Dict[str, str]) -> str:
         """
         根据模板和替换内容生成HTML邮件内容
