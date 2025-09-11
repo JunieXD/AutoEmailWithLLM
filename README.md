@@ -2,6 +2,27 @@
 
 一个基于 Flask 的「教授信息管理 + 邮件发送」的轻量级应用。支持通过 DOCX 文档模板快速个性化生成邮件、CSV 批量导入教授信息、管理发件人配置与用户资料，并记录发送历史。
 
+## 快速开始（uv）
+> 项目使用 uv 管理依赖与运行脚本。请先安装 [uv](https://github.com/astral-sh/uv) ，并在终端中执行以下命令。
+
+1. 同步依赖
+   ```bash
+   uv sync
+   ```
+
+2. 初始化数据库（首次运行必需）
+   ```bash
+   uv run init_database.py
+   ```
+
+3. 启动开发服务
+   ```bash
+   uv run app.py
+   ```
+
+4. 访问：http://localhost:5000
+
+
 
 ## 功能特性
 - 教授信息管理：增/删/改/查、导入导出（CSV）
@@ -37,27 +58,6 @@ AutoEmailSender/
 │   └── static/                  # 静态资源
 └── pyproject.toml               # 依赖声明
 ```
-
-
-## 快速开始（Windows + uv）
-> 项目使用 uv 管理依赖与运行脚本。建议在 CMD 或 PowerShell 中执行以下命令。
-
-1. 同步依赖
-   ```bash
-   uv sync
-   ```
-
-2. 初始化数据库（首次运行必需）
-   ```bash
-   uv run init_database.py
-   ```
-
-3. 启动开发服务
-   ```bash
-   uv run app.py
-   ```
-
-4. 访问：http://localhost:5000
 
 
 ## 配置说明（环境变量）
