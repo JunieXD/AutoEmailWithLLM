@@ -336,10 +336,24 @@ class Utils {
     }
 
     // 格式化日期时间 - 使用用户本地时区
-    static formatDateTime(dateString, options = {}) {
-        if (!dateString) return '未知时间';
+    static formatDateTime(dateInput, options = {}) {
+        if (!dateInput) return '未知时间';
         
-        const date = new Date(dateString);
+        let date;
+        if (typeof dateInput === 'string') {
+            let s = dateInput;
+            // 若为无时区的ISO时间（如 2024-09-11T12:34:56 或带毫秒但无Z/偏移），按UTC处理以避免被当作本地时间解析
+            const isoNoTZ = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+            if (isoNoTZ.test(s)) {
+                s += 'Z';
+            }
+            date = new Date(s);
+        } else if (dateInput instanceof Date) {
+            date = dateInput;
+        } else {
+            return '无效时间';
+        }
+        
         if (isNaN(date.getTime())) return '无效时间';
         
         // 默认格式化选项
@@ -373,10 +387,23 @@ class Utils {
     }
     
     // 格式化相对时间（如：2小时前）
-    static formatRelativeTime(dateString) {
-        if (!dateString) return '未知时间';
+    static formatRelativeTime(dateInput) {
+        if (!dateInput) return '未知时间';
         
-        const date = new Date(dateString);
+        let date;
+        if (typeof dateInput === 'string') {
+            let s = dateInput;
+            const isoNoTZ = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+            if (isoNoTZ.test(s)) {
+                s += 'Z';
+            }
+            date = new Date(s);
+        } else if (dateInput instanceof Date) {
+            date = dateInput;
+        } else {
+            return '无效时间';
+        }
+        
         if (isNaN(date.getTime())) return '无效时间';
         
         const now = new Date();
@@ -394,7 +421,7 @@ class Utils {
         } else if (diffDays < 7) {
             return `${diffDays}天前`;
         } else {
-            return this.formatDateTimeShort(dateString);
+            return this.formatDateTimeShort(dateInput);
         }
     }
 
