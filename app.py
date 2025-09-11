@@ -368,7 +368,7 @@ def create_app():
                     # 尝试作为教授ID查询
                     try:
                         prof_id = int(item)
-                        professor = Professor.query.get(prof_id)
+                        professor = db.session.get(Professor, prof_id)
                         if professor:
                             professors.append({
                                 'name': professor.name,
@@ -389,7 +389,7 @@ def create_app():
             else:
                 # 单个模式：根据教授ID查询
                 for prof_id in selected_professors:
-                    professor = Professor.query.get(prof_id)
+                    professor = db.session.get(Professor, prof_id)
                     if professor:
                         professors.append({
                             'name': professor.name,
