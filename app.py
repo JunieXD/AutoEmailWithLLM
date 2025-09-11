@@ -1,8 +1,10 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, g
 from flask_cors import CORS
 import os
 from datetime import datetime
 import logging
+import uuid
+from werkzeug.exceptions import HTTPException
 
 # 导入自定义模块
 from backend.email_service import EmailService
@@ -15,16 +17,7 @@ from backend.document_service import DocumentService
 from backend.models.user_profile import UserProfile
 from backend.models.user_file import UserFile
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('app.log', encoding='utf-8'),
-        logging.StreamHandler()
-    ]
-)
-
+# 移除原本的 basicConfig，统一使用 Config.init_app 进行日志初始化
 logger = logging.getLogger(__name__)
 
 def create_app():
@@ -34,6 +27,9 @@ def create_app():
     
     # 加载配置
     app.config.from_object(Config)
+
+    # 初始化日志系统（可轮转文件、错误日志分离、请求上下文字段）
+    Config.init_app(app)
     
     # 启用CORS
     CORS(app)
@@ -44,6 +40,44 @@ def create_app():
     # 创建数据库表
     with app.app_context():
         db.create_all()
+    
+    # 请求开始：生成请求ID并记录开始日志
+    @app.before_request
+    def _before_request_logging():
+        g.request_id = str(uuid.uuid4())
+        try:
+            remote = request.headers.get('X-Forwarded-For', request.remote_addr)
+        except Exception:
+            remote = '-'
+        logging.getLogger('request').info(f"Request start | {request.method} {request.path} | from {remote}")
+    
+    # 请求结束：记录结束日志
+    @app.after_request
+    def _after_request_logging(response):
+        logging.getLogger('request').info(f"Request end   | {request.method} {request.path} | status {response.status_code}")
+        return response
+
+    # 全局异常处理：记录堆栈，返回JSON错误
+    @app.errorhandler(HTTPException)
+    def _handle_http_exception(e):
+        logger_app = logging.getLogger('app')
+        path = request.path
+        # 对常见的无害 404 路径直接安静处理，避免噪声
+        if e.code == 404 and path in ('/favicon.ico', '/@vite/client'):
+            return '', 204
+        # 404 记录为 INFO，避免在 WARNING 级别下刷屏
+        if e.code == 404:
+            logger_app.info(f"HTTPException {e.code} on {request.method} {path}: {e.description}")
+        elif e.code >= 500:
+            logger_app.error(f"HTTPException {e.code} on {request.method} {path}: {e.description}")
+        else:
+            logger_app.warning(f"HTTPException {e.code} on {request.method} {path}: {e.description}")
+        return jsonify({'error': e.name, 'message': e.description}), e.code
+
+    @app.errorhandler(Exception)
+    def _handle_exception(e):
+        logging.getLogger('app').exception(f"Unhandled exception: {str(e)}")
+        return jsonify({'error': '服务器内部错误', 'message': str(e)}), 500
     
     # 初始化服务
     email_service = EmailService()
@@ -56,6 +90,16 @@ def create_app():
     def index():
         """主页"""
         return render_template('index.html')
+
+    @app.route('/favicon.ico')
+    def favicon():
+        # 避免浏览器请求favicon导致404噪声
+        return '', 204
+
+    @app.route('/@vite/client')
+    def vite_client():
+        # 某些开发扩展或缓存可能会请求该路径，这里直接静默处理
+        return '', 204
     
     @app.route('/users')
     def users_page():
@@ -219,11 +263,24 @@ def create_app():
     
     @app.route('/api/send-email', methods=['POST'])
     def send_email():
-        """发送邮件"""
+        """发送单封邮件（支持指定 sender_id，缺省回退默认用户；兼容 content/email_content 字段；支持 recipient_email 回退定位教授）"""
         try:
             data = request.get_json()
-            professor_id = data['professor_id']
-            subject = data['subject']
+            # 主题校验
+            subject = data.get('subject')
+            if not subject:
+                return jsonify({'error': '请输入邮件主题'}), 400
+            
+            # 优先使用前端传入的 sender_id
+            sender_id = data.get('sender_id')
+            if sender_id:
+                sender_user = UserProfile.query.filter_by(id=sender_id, is_active=True).first()
+                if not sender_user:
+                    return jsonify({'error': '选择的发送用户不存在或未激活'}), 400
+            else:
+                sender_user = user_service.get_default_user()
+                if not sender_user:
+                    return jsonify({'error': '请先设置默认用户'}), 400
             
             # 获取邮件内容
             content_source = data.get('content_source', 'generated')
@@ -238,23 +295,29 @@ def create_app():
                     return jsonify({'error': f'获取文件内容失败: {error}'}), 400
                 email_content = content
             else:
-                email_content = data['email_content']
+                email_content = data.get('email_content') or data.get('content')
+                if not email_content:
+                    return jsonify({'error': '请输入邮件内容'}), 400
             
-            professor = db.session.get(Professor, professor_id)
+            # 确定教授
+            professor = None
+            professor_id = data.get('professor_id')
+            if professor_id:
+                professor = db.session.get(Professor, professor_id)
+            else:
+                recipient_email = data.get('recipient_email')
+                if recipient_email:
+                    professor = Professor.query.filter_by(email=recipient_email).first()
             if not professor:
-                return jsonify({'error': '教授信息不存在'}), 404
+                return jsonify({'error': '教授信息不存在，请先在教授列表中添加该教授'}), 404
             
-            # 获取默认用户的邮件配置
-            default_user = user_service.get_default_user()
-            if not default_user:
-                return jsonify({'error': '请先设置默认用户'}), 400
-            
+            # 构造发件人配置（基于所选用户）
             sender_config = {
-                'email': default_user.email,
-                'password': default_user.email_password,
-                'smtp_server': default_user.smtp_server,
-                'smtp_port': default_user.smtp_port,
-                'name': default_user.name
+                'email': sender_user.email,
+                'password': sender_user.email_password,
+                'smtp_server': sender_user.smtp_server,
+                'smtp_port': sender_user.smtp_port,
+                'name': sender_user.name
             }
             
             # 处理附件
@@ -268,21 +331,17 @@ def create_app():
                         # 生成显示名称
                         display_name = user_file.file_name
                         if user_file.file_type == 'resume':
-                            # 简历类型自动重命名为"简历-姓名"的格式
-                            name_part = os.path.splitext(user_file.file_name)[0]
+                            # 简历类型自动重命名
                             ext_part = os.path.splitext(user_file.file_name)[1]
-                            display_name = f"简历-{default_user.name}{ext_part}"
+                            display_name = f"简历-{sender_user.name}{ext_part}"
                         
                         attachments.append({
                             'file_path': user_file.file_path,
                             'display_name': display_name
                         })
             
-            # 发送邮件
-            # 根据内容来源和格式确定邮件格式
-            content_type = 'html'  # 默认使用HTML格式
-            
-            # 检查是否为AI生成的纯文本格式邮件
+            # 邮件格式
+            content_type = 'html'
             email_format = data.get('format') or data.get('format_type')
             if email_format == 'text':
                 content_type = 'plain'
@@ -301,25 +360,25 @@ def create_app():
             
             # 记录发送结果
             email_record = EmailRecord(
-                professor_id=professor_id,
+                professor_id=professor.id,
                 subject=subject,
                 content=email_content,
                 status='sent' if success else 'failed',
-                sender_name=default_user.name,
-                sender_email=default_user.email,
+                sender_name=sender_user.name,
+                sender_email=sender_user.email,
                 sent_at=datetime.now() if success else None
             )
             db.session.add(email_record)
             db.session.commit()
             
             if success:
-                return jsonify({'message': '邮件发送成功'})
+                return jsonify({'message': '邮件发送成功', 'success': True})
             else:
-                return jsonify({'error': '邮件发送失败'}), 500
-                
+                return jsonify({'error': '邮件发送失败', 'success': False}), 500
+
         except Exception as e:
             logger.error(f"发送邮件失败: {e}")
-            return jsonify({'error': str(e)}), 500
+            return jsonify({'error': str(e), 'success': False}), 500
     
     @app.route('/api/generate-document-email', methods=['POST'])
     def generate_document_email():
@@ -462,6 +521,166 @@ def create_app():
             return jsonify({'success': False, 'message': str(e)}), 500
     
     # 批量发送邮件API已移除（AI功能已删除）
+
+    @app.route('/api/send-batch-emails', methods=['POST'])
+    def send_batch_emails():
+        """批量发送纯文本邮件（支持指定 sender_id，缺省回退默认用户）"""
+        try:
+            data = request.get_json()
+            professors = data.get('professors', [])
+            subject = data.get('subject', '')
+            content = data.get('content', '')
+            send_interval = int(data.get('send_interval', 5) or 0)
+            personalize = bool(data.get('personalize', False))
+            sender_id = data.get('sender_id')
+
+            if not professors:
+                return jsonify({'error': '请选择至少一个教授'}), 400
+            if not subject:
+                return jsonify({'error': '请输入邮件主题'}), 400
+            if not content:
+                return jsonify({'error': '请输入邮件内容'}), 400
+
+            # 确定发送用户
+            if sender_id:
+                sender_user = UserProfile.query.filter_by(id=sender_id, is_active=True).first()
+                if not sender_user:
+                    return jsonify({'error': '选择的发送用户不存在或未激活'}), 400
+            else:
+                sender_user = user_service.get_default_user()
+                if not sender_user:
+                    return jsonify({'error': '请先设置默认用户'}), 400
+
+            current_date = datetime.now().strftime('%Y年%m月%d日')
+
+            success_count = 0
+            failed_count = 0
+            failed_emails = []
+
+            for idx, professor_data in enumerate(professors):
+                try:
+                    professor_id = professor_data.get('id')
+                    professor = db.session.get(Professor, professor_id) if professor_id else None
+                    if not professor:
+                        failed_count += 1
+                        failed_emails.append({
+                            'professor_id': professor_id,
+                            'professor_name': professor_data.get('name', f'ID:{professor_id}'),
+                            'email': professor_data.get('email', 'unknown'),
+                            'error': '教授信息不存在'
+                        })
+                        continue
+
+                    # 个性化替换
+                    replacements = {
+                        '{{name}}': professor.name or '',
+                        '{{date}}': current_date,
+                        '{{university}}': professor.university or '',
+                        '{{department}}': professor.department or '',
+                        '{{research_direction}}': professor.research_area or ''
+                    }
+                    personalized_subject = subject
+                    personalized_content = content
+                    if personalize:
+                        for placeholder, value in replacements.items():
+                            personalized_subject = personalized_subject.replace(placeholder, value)
+                            personalized_content = personalized_content.replace(placeholder, value)
+
+                    # 处理附件（支持 attachment_file_ids 或 attachments 为ID列表）
+                    attachment_ids = data.get('attachment_file_ids') or data.get('attachments') or []
+                    attachments = []
+                    if isinstance(attachment_ids, list) and attachment_ids:
+                        from backend.models.user_file import UserFile
+                        for file_id in attachment_ids:
+                            try:
+                                # 仅处理整数ID
+                                file_id_int = int(file_id)
+                            except Exception:
+                                continue
+                            user_file = UserFile.query.filter_by(id=file_id_int, is_active=True).first()
+                            if user_file and os.path.exists(user_file.file_path):
+                                display_name = user_file.file_name
+                                if user_file.file_type == 'resume':
+                                    ext_part = os.path.splitext(user_file.file_name)[1]
+                                    display_name = f"简历-{sender_user.name}{ext_part}"
+                                attachments.append({
+                                    'file_path': user_file.file_path,
+                                    'display_name': display_name
+                                })
+
+                    # 发送邮件
+                    sender_config = {
+                        'email': sender_user.email,
+                        'name': sender_user.name,
+                        'password': sender_user.email_password,
+                        'smtp_server': sender_user.smtp_server,
+                        'smtp_port': sender_user.smtp_port
+                    }
+
+                    success = email_service.send_email(
+                        recipient_email=professor.email,
+                        recipient_name=professor.name,
+                        subject=personalized_subject,
+                        content=personalized_content,
+                        sender_config=sender_config,
+                        attachments=attachments,
+                        content_type='plain'
+                    )
+
+                    # 记录发送结果
+                    email_record = EmailRecord(
+                        professor_id=professor.id,
+                        subject=personalized_subject,
+                        content=personalized_content,
+                        status='sent' if success else 'failed',
+                        sender_name=sender_user.name,
+                        sender_email=sender_user.email,
+                        sent_at=datetime.now() if success else None
+                    )
+                    db.session.add(email_record)
+
+                    if success:
+                        success_count += 1
+                        logger.info(f'批量纯文本邮件发送成功: {professor.name} <{professor.email}>')
+                    else:
+                        failed_count += 1
+                        failed_emails.append({
+                            'professor_id': professor.id,
+                            'professor_name': professor.name,
+                            'email': professor.email,
+                            'error': '邮件发送失败'
+                        })
+
+                    # 发送间隔
+                    if idx < len(professors) - 1 and send_interval > 0:
+                        import time
+                        time.sleep(send_interval)
+
+                except Exception as e:
+                    failed_count += 1
+                    failed_emails.append({
+                        'professor_id': professor_data.get('id', 'unknown'),
+                        'professor_name': professor_data.get('name', 'unknown'),
+                        'email': professor_data.get('email', 'unknown'),
+                        'error': str(e)
+                    })
+                    logger.error(f'批量发送纯文本邮件出错: {str(e)}')
+            
+            # 提交
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': f'邮件发送完成！成功: {success_count}，失败: {failed_count}',
+                'success_count': success_count,
+                'failed_count': failed_count,
+                'failed_emails': failed_emails
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f'批量发送纯文本邮件失败: {str(e)}')
+            return jsonify({'error': f'发送失败: {str(e)}'}), 500
     
     @app.route('/api/email-records', methods=['GET'])
     def email_records():
@@ -1018,7 +1237,7 @@ def create_app():
         except Exception as e:
             logger.error(f"转换用户文档失败: {str(e)}")
             return jsonify({'error': str(e)}), 500
-    
+
 
     
     # 文档转换API
@@ -1084,6 +1303,7 @@ def create_app():
             subject = data.get('subject', '')
             send_interval = data.get('send_interval', 5)
             attachment_ids = data.get('attachments', [])
+            sender_id = data.get('sender_id')
             
             if not professors:
                 return jsonify({'error': '请选择至少一个教授'}), 400
@@ -1093,6 +1313,16 @@ def create_app():
                 
             if not subject:
                 return jsonify({'error': '请输入邮件主题'}), 400
+            
+            # 确定发送用户：优先使用前端选择的sender_id，缺省则回退到默认用户
+            if sender_id:
+                sender_profile = UserProfile.query.filter_by(id=sender_id, is_active=True).first()
+                if not sender_profile:
+                    return jsonify({'error': '选择的发送用户不存在或未激活'}), 400
+            else:
+                sender_profile = user_service.get_default_user()
+                if not sender_profile:
+                    return jsonify({'error': '请先设置默认用户'}), 400
             
             # 获取文档内容（HTML格式）
             document_id = documents[0]['id']  # 使用第一个文档
@@ -1140,17 +1370,8 @@ def create_app():
                     for placeholder, value in replacements.items():
                         personalized_content = personalized_content.replace(placeholder, value)
                     
-                    # 获取默认发送人信息
-                    default_user = user_service.get_default_user()
-                    if not default_user:
-                        failed_count += 1
-                        failed_emails.append({
-                            'professor_id': professor_id,
-                            'professor_name': professor.name,
-                            'email': professor.email,
-                            'error': '请先设置默认用户'
-                        })
-                        continue
+                    # 已在函数开始处确定sender_profile，无需在循环内再次获取
+                    sender_user = sender_profile
                     
                     # 处理附件
                     attachments = []
@@ -1162,21 +1383,21 @@ def create_app():
                                 # 生成显示名称
                                 display_name = user_file.file_name
                                 if user_file.file_type == 'resume':
-                                    # 简历类型自动重命名为"简历-姓名"的格式
+                                    # 简历类型自动重命名
                                     name_part = os.path.splitext(user_file.file_name)[0]
                                     ext_part = os.path.splitext(user_file.file_name)[1]
-                                    display_name = f"简历-{default_user.name}{ext_part}"
+                                    display_name = f"简历-{sender_user.name}{ext_part}"
                                 
                                 attachments.append({
                                     'file_path': user_file.file_path,
                                     'display_name': display_name
                                 })
                     
-                    # 发送邮件
+                    # 发送邮件（使用所选发送用户的配置）
                     sender_config = {
-                        'email': default_user.email,
-                        'name': default_user.name,
-                        'password': default_user.email_password
+                        'email': sender_user.email,
+                        'name': sender_user.name,
+                        'password': sender_user.email_password
                     }
                     
                     success = email_service.send_email(
@@ -1195,8 +1416,8 @@ def create_app():
                         subject=personalized_subject,
                         content=personalized_content,
                         status='sent' if success else 'failed',
-                        sender_name=default_user.name,
-                        sender_email=default_user.email,
+                        sender_name=sender_user.name,
+                        sender_email=sender_user.email,
                         sent_at=datetime.now() if success else None
                     )
                     db.session.add(email_record)
@@ -1269,18 +1490,110 @@ def create_app():
     def get_log_settings():
         """获取日志设置"""
         try:
+            # 从 app.config 读取当前设置
+            log_level = app.config.get('LOG_LEVEL', 'INFO')
+            log_file = app.config.get('LOG_FILE', 'app.log')
+            console_output = app.config.get('CONSOLE_OUTPUT', True)
             return jsonify({
                 'success': True,
                 'data': {
-                    'log_level': 'INFO',
-                    'log_file': 'app.log',
-                    'console_output': True
+                    'log_level': str(log_level).upper(),
+                    'log_file': log_file,
+                    'console_output': bool(console_output)
                 }
             })
         except Exception as e:
-            logger.error(f"获取日志设置失败: {e}")
+            logger.exception(f"获取日志设置失败: {e}")
             return jsonify({'error': str(e)}), 500
-    
+
+    @app.route('/api/settings/log', methods=['POST'])
+    def update_log_settings():
+        """更新日志设置：日志级别/文件/控制台输出"""
+        try:
+            data = request.get_json(silent=True) or {}
+            new_level = str(data.get('log_level', app.config.get('LOG_LEVEL', 'INFO'))).upper()
+            new_file = data.get('log_file', app.config.get('LOG_FILE', 'app.log'))
+            new_console = bool(data.get('console_log', data.get('console_output', app.config.get('CONSOLE_OUTPUT', True))))
+
+            # 校验级别
+            valid = {'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'}
+            if new_level not in valid:
+                return jsonify({'success': False, 'message': '无效的日志级别'}), 400
+
+            root_logger = logging.getLogger()
+            # 更新根日志级别
+            root_logger.setLevel(getattr(logging, new_level, logging.INFO))
+
+            handlers = app.config.get('LOG_HANDLERS', {})
+            file_handler = handlers.get('file')
+            error_handler = handlers.get('error')
+            console_handler = handlers.get('console')
+
+            # 统一获取 formatter 与 filters
+            def _get_formatter_and_filters(src_handler):
+                if src_handler is None:
+                    # 兜底定义一个与 Config.init_app 一致的格式
+                    fmt = logging.Formatter(
+                        fmt='%(asctime)s | %(levelname)s | %(name)s | %(request_id)s | %(method)s %(path)s | %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S'
+                    )
+                    return fmt, []
+                return src_handler.formatter, list(getattr(src_handler, 'filters', []))
+
+            formatter, filters = _get_formatter_and_filters(file_handler or error_handler)
+
+            # 替换文件处理器（如文件名变化）
+            safe_name = os.path.basename(new_file) if new_file else 'app.log'
+            new_path = os.path.join(Config.LOG_DIR, safe_name)
+            if file_handler:
+                try:
+                    root_logger.removeHandler(file_handler)
+                    file_handler.close()
+                except Exception:
+                    pass
+            from logging.handlers import RotatingFileHandler
+            new_file_handler = RotatingFileHandler(new_path, maxBytes=Config.LOG_MAX_BYTES, backupCount=Config.LOG_BACKUP_COUNT, encoding='utf-8')
+            new_file_handler.setLevel(getattr(logging, new_level, logging.INFO))
+            if formatter:
+                new_file_handler.setFormatter(formatter)
+            for flt in filters:
+                new_file_handler.addFilter(flt)
+            root_logger.addHandler(new_file_handler)
+            handlers['file'] = new_file_handler
+
+            # 控制台开关
+            if new_console and not console_handler:
+                console_handler = logging.StreamHandler()
+                console_handler.setLevel(getattr(logging, new_level, logging.INFO))
+                if formatter:
+                    console_handler.setFormatter(formatter)
+                for flt in filters:
+                    console_handler.addFilter(flt)
+                root_logger.addHandler(console_handler)
+                handlers['console'] = console_handler
+            elif (not new_console) and console_handler:
+                try:
+                    root_logger.removeHandler(console_handler)
+                    console_handler.close()
+                except Exception:
+                    pass
+                handlers['console'] = None
+
+            # 错误处理器级别保持 ERROR，不动
+            if error_handler:
+                error_handler.setLevel(logging.ERROR)
+
+            # 回写 app.config
+            app.config['LOG_HANDLERS'] = handlers
+            app.config['LOG_LEVEL'] = new_level
+            app.config['LOG_FILE'] = safe_name
+            app.config['CONSOLE_OUTPUT'] = new_console
+
+            return jsonify({'success': True})
+        except Exception as e:
+            logger.exception(f"更新日志设置失败: {e}")
+            return jsonify({'success': False, 'message': str(e)}), 500
+
     @app.route('/api/settings/database', methods=['GET'])
     def get_database_settings():
         """获取数据库信息"""

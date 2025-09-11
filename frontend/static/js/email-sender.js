@@ -110,27 +110,35 @@ class EmailSender {
 
     // 获取单个邮件表单数据
     getSingleEmailFormData() {
+        const contentValue = document.getElementById('email-content')?.value;
+        const selectedAttachmentIds = this.getSelectedAttachments();
         return {
             recipient_email: document.getElementById('recipient-email')?.value,
             recipient_name: document.getElementById('recipient-name')?.value,
             subject: document.getElementById('email-subject')?.value,
-            content: document.getElementById('email-content')?.value,
-            attachments: this.getAttachments(),
-            send_time: document.getElementById('send-time')?.value || null
+            content: contentValue,
+            email_content: contentValue, // 同步提供 email_content，兼容后端
+            attachment_file_ids: selectedAttachmentIds,
+            send_time: document.getElementById('send-time')?.value || null,
+            sender_id: document.getElementById('doc-sender-user')?.value || null
         };
     }
 
     // 获取批量邮件表单数据
     getBatchEmailFormData() {
         const selectedProfessors = this.getSelectedProfessors();
+        const contentValue = document.getElementById('batch-content')?.value;
+        const selectedAttachmentIds = this.getSelectedAttachments();
         
         return {
             professors: selectedProfessors,
             subject: document.getElementById('batch-subject')?.value,
-            content: document.getElementById('batch-content')?.value,
-            attachments: this.getAttachments(),
+            content: contentValue,
+            email_content: contentValue, // 同步提供 email_content，兼容后端
+            attachment_file_ids: selectedAttachmentIds,
             send_interval: parseInt(document.getElementById('send-interval')?.value) || 5,
-            personalize: document.getElementById('personalize-emails')?.checked || false
+            personalize: document.getElementById('personalize-emails')?.checked || false,
+            sender_id: document.getElementById('doc-sender-user')?.value || null
         };
     }
 
@@ -146,7 +154,8 @@ class EmailSender {
             subject: document.getElementById('doc-email-subject')?.value,
             content: '', // HTML模板中没有doc-content元素
             send_interval: 5, // HTML模板中没有doc-send-interval元素，使用默认值
-            attachments: selectedAttachments
+            attachments: selectedAttachments,
+            sender_id: document.getElementById('doc-sender-user')?.value || null
         };
     }
 
