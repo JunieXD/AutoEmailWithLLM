@@ -176,27 +176,60 @@ class EmailSender {
         
         if (selectionMode === 'single') {
             // 单个选择模式
-            const professorSelect = document.getElementById('doc-select-professor');
-            if (professorSelect && professorSelect.value) {
-                const selectedOption = professorSelect.options[professorSelect.selectedIndex];
+            const professorHiddenInput = document.getElementById('doc-select-professor');
+            const professorDisplayInput = document.getElementById('doc-select-professor-input');
+            if (professorHiddenInput && professorHiddenInput.value) {
+                // 从显示的输入框中解析教授信息
+                const displayValue = professorDisplayInput ? professorDisplayInput.value : '';
+                const nameParts = displayValue.split(' - ');
+                const professorName = nameParts[0] || '';
+                const professorUniversity = nameParts[1] || '';
+                
                 selectedProfessors.push({
-                    id: parseInt(professorSelect.value),
-                    name: selectedOption.dataset.name || selectedOption.text,
-                    email: selectedOption.dataset.email || '',
-                    university: selectedOption.dataset.university || ''
+                    id: parseInt(professorHiddenInput.value),
+                    name: professorName,
+                    email: '', // 邮箱信息在搜索时已经验证，这里可以为空
+                    university: professorUniversity
                 });
             }
         } else if (selectionMode === 'batch') {
-            // 批量选择模式 - 查找复选框
-            const checkboxes = document.querySelectorAll('#doc-batch-professors-list input[type="checkbox"]:checked');
-            checkboxes.forEach(cb => {
-                selectedProfessors.push({
-                    id: parseInt(cb.value),
-                    name: cb.dataset.name || '',
-                    email: cb.dataset.email || '',
-                    university: cb.dataset.university || ''
+            // 批量选择模式 - 优先使用ProfessorManager的全局选中状态映射（可覆盖筛选导致的DOM缺失问题）
+            const pm = window.ProfessorManager;
+            if (pm && pm.professorCheckStates) {
+                // 基于映射拿到所有选中的ID
+                const selectedIds = Object.entries(pm.professorCheckStates)
+                    .filter(([_, checked]) => checked)
+                    .map(([id]) => parseInt(id));
+                
+                if (selectedIds.length > 0) {
+                    // 从原始教授列表中取出详细信息
+                    const original = pm.originalProfessors || [];
+                    const profMap = new Map(original.map(p => [parseInt(p.id), p]));
+                    
+                    selectedIds.forEach(id => {
+                        const prof = profMap.get(id);
+                        selectedProfessors.push({
+                            id,
+                            name: prof?.name || '',
+                            email: prof?.email || '',
+                            university: prof?.university || ''
+                        });
+                    });
+                }
+            } else {
+                // 回退：仅在没有状态映射时使用 DOM 查询（此时只包含当前显示的复选框）
+                const checkboxes = document.querySelectorAll('#doc-batch-professors-list .professor-checkbox:checked');
+                
+                checkboxes.forEach(cb => {
+                    selectedProfessors.push({
+                        id: parseInt(cb.value),
+                        name: cb.dataset.name || '',
+                        email: cb.dataset.email || '',
+                        university: cb.dataset.university || ''
+                    });
                 });
-            });
+            }
+
         }
         
         return selectedProfessors;
@@ -441,7 +474,7 @@ class EmailSender {
     // 加载教授列表供选择
     async loadProfessorsForSelection() {
         try {
-            const professors = await Utils.apiRequest('/api/professors');
+            const professors = await Utils.apiRequest('/api/professors/all');
             this.displayProfessorsForSelection(professors);
         } catch (error) {
             console.error('加载教授列表失败:', error);

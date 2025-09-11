@@ -14,62 +14,159 @@ class ImportService:
         self.required_columns = ['name', 'email', 'university']
         self.optional_columns = ['department', 'research_area', 'introduction']
         self.all_columns = self.required_columns + self.optional_columns
-    
-    def validate_csv_file(self, file: FileStorage) -> Tuple[bool, str]:
-        """验证CSV文件格式"""
+
+    # 新增：按常见编码集尝试读取CSV，返回DataFrame与使用的编码（增强：加入分隔符自适应与UTF-16变体）
+    def _read_csv_with_encoding(self, file: FileStorage) -> Tuple[pd.DataFrame, str]:
+        encodings = [
+            'utf-8', 'utf-8-sig',
+            'gbk', 'gb18030', 'big5', 'shift_jis',
+            'latin1',
+            'utf-16', 'utf-16le', 'utf-16be'
+        ]
+        read_attempts = [
+            {"sep": None, "engine": 'python'},   # 自动嗅探分隔符
+            {"sep": ',', "engine": None},        # 逗号（C 引擎）
+            {"sep": ',', "engine": 'python'},    # 逗号（Python 引擎）
+            {"sep": ';', "engine": 'python'},    # 分号
+            {"sep": '\t', "engine": 'python'},  # 制表符
+        ]
+        last_error = None
+        candidate_df: pd.DataFrame | None = None
+        candidate_enc: str | None = None
+        for enc in encodings:
+            for opts in read_attempts:
+                try:
+                    file.stream.seek(0)
+                    df = pd.read_csv(
+                        file.stream,
+                        encoding=enc,
+                        **{k: v for k, v in opts.items() if v is not None}
+                    )
+                    # 优先返回包含数据行的解析结果
+                    if len(df) > 0:
+                        logger.info(f"CSV解析成功: encoding={enc}, opts={opts}, 行数={len(df)}, 列数={len(df.columns)}")
+                        return df, enc
+                    # 记录首个成功但空的解析结果，继续尝试其他组合
+                    if candidate_df is None:
+                        candidate_df, candidate_enc = df, enc
+                except Exception as e:
+                    last_error = e
+                    continue
+        # 若全部解析均失败但有一个成功且为空的候选，返回候选供上层判定
+        if candidate_df is not None and candidate_enc is not None:
+            logger.info(f"CSV解析均无数据行，返回首个成功但空的结果: encoding={candidate_enc}, 行数=0, 列数={len(candidate_df.columns)}")
+            return candidate_df, candidate_enc
+        # 若所有编码+分隔符均失败，则抛出最后的错误
+        raise last_error if last_error else UnicodeDecodeError('unknown', b'', 0, 1, 'unable to detect encoding')
+
+    # 新增：清洗邮箱的工具方法
+    def _clean_email_series(self, series: pd.Series) -> pd.Series:
+        s = series.astype(str).str.strip()
+        # 常见全角/错别符号替换
+        s = (s.str.replace('＠', '@', regex=False)
+               .str.replace('。', '.', regex=False)
+               .str.replace('，', ',', regex=False)
+               .str.replace('；', ';', regex=False)
+               .str.replace('<', ' <', regex=False)  # 便于提取形如 Name<email>
+               .str.replace('>', '>', regex=False))
+        # 提取第一个符合规范的邮箱子串（处理形如 "Name <email@domain.com>", 多个邮箱用逗号/分号分隔等）
+        extracted = s.str.extract(r'([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})')[0]
+        return extracted.fillna(s)
+
+    def validate_csv_file(self, file: FileStorage, allow_empty: bool = False) -> Tuple[bool, str]:
+        """验证CSV文件格式
+        - allow_empty: 是否允许无数据行（用于预览阶段）。
+        """
         try:
             # 检查文件扩展名
             if not file.filename.lower().endswith('.csv'):
                 return False, "文件必须是CSV格式"
             
-            # 读取CSV文件
-            df = pd.read_csv(file.stream)
+            # 读取CSV文件（编码+分隔符自适应）
+            df, used_enc = self._read_csv_with_encoding(file)
             
-            # 重置文件指针
+            # 重置文件指针，便于后续再次读取
             file.stream.seek(0)
             
-            # 检查是否为空
-            if df.empty:
-                return False, "CSV文件不能为空"
-            
-            # 检查必需列
+            # 先检查必需列
             missing_columns = [col for col in self.required_columns if col not in df.columns]
             if missing_columns:
                 return False, f"缺少必需的列: {', '.join(missing_columns)}"
             
-            # 检查必需列是否有空值
-            for col in self.required_columns:
-                if df[col].isnull().any():
-                    return False, f"列 '{col}' 不能有空值"
+            # 预览时允许无数据行；导入时不允许
+            # 更稳健地判断是否存在“有效数据行”：基于必填列的非空值统计
+            if set(self.required_columns).issubset(set(df.columns)):
+                df_required = df[self.required_columns].astype(str).apply(lambda c: c.str.strip())
+                nonempty_mask = df_required.replace({'': None}).notna().any(axis=1)
+                nonempty_rows = int(nonempty_mask.sum())
+            else:
+                # 缺列的情况上面已返回，这里兜底
+                nonempty_rows = len(df)
+            has_data_rows = nonempty_rows > 0
+            logger.info(f"CSV文件状态: 总行数={len(df)}, 非空数据行(基于必填列)={nonempty_rows}, 列数={len(df.columns)}, 列名={list(df.columns)}, allow_empty={allow_empty}")
             
-            # 检查邮箱格式
-            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-            invalid_emails = df[~df['email'].str.match(email_pattern, na=False)]
-            if not invalid_emails.empty:
-                return False, f"发现无效邮箱格式，行号: {invalid_emails.index.tolist()}"
+            if not allow_empty and not has_data_rows:
+                return False, "CSV中没有数据行"
+            
+            # 以下检查仅在存在数据行时进行
+            if not df.empty:
+                # 检查必需列是否有空值
+                for col in self.required_columns:
+                    if df[col].isnull().any():
+                        return False, f"列 '{col}' 不能有空值"
+                
+                # 邮箱清洗与格式检查
+                df['email'] = self._clean_email_series(df['email'])
+                email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                invalid_mask = ~df['email'].str.match(email_pattern, na=False)
+                if invalid_mask.any():
+                    # 将0基索引转换为更友好的表格行号（含表头，因此+2）
+                    invalid_rows = (df.index[invalid_mask] + 2).tolist()
+                    return False, f"发现无效邮箱格式，行号: {invalid_rows}"
             
             return True, "文件验证通过"
             
         except Exception as e:
             logger.error(f"CSV文件验证失败: {str(e)}")
             return False, f"文件读取失败: {str(e)}"
-    
+
     def preview_csv_data(self, file: FileStorage, limit: int = 10) -> Dict[str, Any]:
         """预览CSV数据"""
         try:
-            df = pd.read_csv(file.stream)
+            # 编码自适应读取
+            df, used_enc = self._read_csv_with_encoding(file)
+            # 预览完成后复位流位置
             file.stream.seek(0)
+
+            # 邮箱清洗与有效性统计（用于valid_rows）
+            if 'email' in df.columns:
+                df['email'] = self._clean_email_series(df['email'])
+                email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}$'
+                email_ok = df['email'].str.match(email_pattern, na=False)
+            else:
+                email_ok = pd.Series([False] * len(df))
             
-            # 获取预览数据
-            preview_data = df.head(limit).fillna('').to_dict('records')
+            # 必填字段校验统计
+            required_ok = pd.Series([True] * len(df))
+            for col in self.required_columns:
+                if col in df.columns:
+                    required_ok &= df[col].astype(str).str.strip().ne('') & df[col].notna()
+                else:
+                    required_ok &= False
             
-            # 统计信息
+            valid_rows = int((required_ok & email_ok).sum())
+            
+            # 获取预览数据（兼容前端字段名：preview 与 preview_data）
+            preview_records = df.head(limit).fillna('').to_dict('records')
+            
             stats = {
                 'total_rows': len(df),
                 'columns': list(df.columns),
                 'required_columns': self.required_columns,
                 'optional_columns': self.optional_columns,
-                'preview_data': preview_data
+                'preview': preview_records,        # 兼容 professor-manager.js 的 displayCSVPreview
+                'preview_data': preview_records,   # 保留原字段
+                'valid_rows': valid_rows
             }
             
             return stats
@@ -81,13 +178,13 @@ class ImportService:
     def import_professors_from_csv(self, file: FileStorage, skip_duplicates: bool = True) -> Dict[str, Any]:
         """从CSV导入教授信息"""
         try:
-            # 验证文件
-            is_valid, message = self.validate_csv_file(file)
+            # 验证文件（导入阶段不允许空数据行）
+            is_valid, message = self.validate_csv_file(file, allow_empty=False)
             if not is_valid:
                 raise Exception(message)
             
-            # 读取CSV数据
-            df = pd.read_csv(file.stream)
+            # 读取CSV数据（编码自适应）
+            df, used_enc = self._read_csv_with_encoding(file)
             df = df.fillna('')  # 填充空值
             
             imported_count = 0
@@ -162,7 +259,7 @@ class ImportService:
             db.session.rollback()
             logger.error(f"CSV导入失败: {str(e)}")
             raise Exception(f"导入失败: {str(e)}")
-    
+
     def generate_csv_template(self) -> str:
         """生成CSV模板文件"""
         try:

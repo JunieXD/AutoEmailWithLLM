@@ -7,6 +7,35 @@
 {% block content %}
     <div class="container mt-4">
         
+        <!-- 关键词替换说明 -->
+        <div class="mb-3">
+            <h6 class="text-info"><i class="bi bi-info-circle"></i> 关键词替换说明</h6>
+            <div class="alert alert-info">
+                <p class="mb-2"><strong>在邮件主题和内容中，您可以使用以下关键词，系统会自动替换：</strong></p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="list-unstyled mb-0">
+                            <li><code>{{ '{{name}}' }}</code> → 教授姓名</li>
+                            <li><code>{{ '{{date}}' }}</code> → 当前日期</li>
+                            <li><code>{{ '{{university}}' }}</code> → 学校名称</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul class="list-unstyled mb-0">
+                            <li><code>{{ '{{department}}' }}</code> → 学院名称</li>
+                            <li><code>{{ '{{research_direction}}' }}</code> → 研究方向</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        <i class="bi bi-lightbulb"></i> 
+                        示例："Dear {{ '{{name}}' }}, 关于{{ '{{research_direction}}' }}的学术合作咨询 - {{ '{{date}}' }}"
+                    </small>
+                </div>
+            </div>
+        </div>
+        
         <!-- 使用已上传文档界面 -->
         <div id="document-usage-interface" class="row">
             <div class="col-md-12">
@@ -61,9 +90,16 @@
                                 <!-- 单个选择 -->
                                 <div id="doc-single-selection" class="mb-3">
                                     <label for="doc-select-professor" class="form-label">选择教授 *</label>
-                                    <select class="form-select" id="doc-select-professor">
-                                        <option value="">请选择教授</option>
-                                    </select>
+                                    <div class="position-relative">
+                                        <input type="text" class="form-control" id="doc-select-professor-input" 
+                                               placeholder="输入教授姓名或学校进行搜索..." 
+                                               autocomplete="off">
+                                        <input type="hidden" id="doc-select-professor" name="doc-select-professor">
+                                        <div id="doc-professor-dropdown" class="dropdown-menu w-100" style="max-height: 300px; overflow-y: auto; display: none;">
+                                            <!-- 搜索结果将在这里显示 -->
+                                        </div>
+                                    </div>
+                                    <div class="form-text">输入教授姓名或学校名称进行搜索</div>
                                 </div>
                                 
                                 <!-- 批量选择 -->
@@ -99,34 +135,7 @@
                     <div class="form-text">建议包含您的姓名或研究方向，让教授更容易识别</div>
                 </div>
                 
-                <!-- 关键词替换说明 -->
-                <div class="mb-3">
-                    <h6 class="text-info"><i class="bi bi-info-circle"></i> 关键词替换说明</h6>
-                    <div class="alert alert-info">
-                        <p class="mb-2"><strong>在邮件主题和内容中，您可以使用以下关键词，系统会自动替换：</strong></p>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <ul class="list-unstyled mb-0">
-                                    <li><code>{{ '{{name}}' }}</code> → 教授姓名</li>
-                                    <li><code>{{ '{{date}}' }}</code> → 当前日期</li>
-                                    <li><code>{{ '{{university}}' }}</code> → 学校名称</li>
-                                </ul>
-                            </div>
-                            <div class="col-md-6">
-                                <ul class="list-unstyled mb-0">
-                                    <li><code>{{ '{{department}}' }}</code> → 学院名称</li>
-                                    <li><code>{{ '{{research_direction}}' }}</code> → 研究方向</li>
-                                </ul>
-                            </div>
-                        </div>
-                        <div class="mt-2">
-                            <small class="text-muted">
-                                <i class="bi bi-lightbulb"></i> 
-                                示例："Dear {{ '{{name}}' }}, 关于{{ '{{research_direction}}' }}的学术合作咨询 - {{ '{{date}}' }}"
-                            </small>
-                        </div>
-                    </div>
-                </div>
+
             </div>
             
             <!-- 附件选择 -->

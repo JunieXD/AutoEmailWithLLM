@@ -68,13 +68,36 @@
                         <button class="btn btn-outline-secondary btn-sm" onclick="clearEmailFilters()">
                             <i class="bi bi-x-circle"></i> 清除筛选
                         </button>
-                        <span class="ms-3 text-muted" id="records-count">共 0 条记录</span>
+                    </div>
+                </div>
+                
+                <!-- 分页设置 -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="records-per-page-select" class="form-label">每页显示数量</label>
+                        <select id="records-per-page-select" class="form-select form-select-sm" onchange="window.RecordsManager.changePerPage()">
+                            <option value="5" selected>5条/页</option>
+                            <option value="10">10条/页</option>
+                            <option value="20">20条/页</option>
+                            <option value="50">50条/页</option>
+                            <option value="100">100条/页</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <span class="text-muted" id="records-pagination-info">共 0 条记录</span>
                     </div>
                 </div>
                 
                 <div id="email-records-list">
                     <!-- 邮件记录将在这里动态加载 -->
                 </div>
+                
+                <!-- 分页导航 -->
+                <nav aria-label="邮件记录分页" id="records-pagination-nav" style="display: none;">
+                    <ul class="pagination justify-content-center" id="records-pagination-controls">
+                        <!-- 分页按钮将在这里动态生成 -->
+                    </ul>
+                </nav>
             </div>
         </div>
     </div>

@@ -88,9 +88,33 @@
                             </div>
                         </div>
                         
+                        <!-- 分页设置 -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="per-page-select" class="form-label">每页显示数量</label>
+                                <select class="form-select" id="per-page-select" onchange="window.ProfessorManager.changePerPage()">
+                                    <option value="5" selected>5条/页</option>
+                                    <option value="10">10条/页</option>
+                                    <option value="20">20条/页</option>
+                                    <option value="50">50条/页</option>
+                                    <option value="100">100条/页</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end">
+                                <span class="text-muted" id="pagination-info">共 0 条记录</span>
+                            </div>
+                        </div>
+                        
                         <div id="professors-list">
                             <!-- 教授列表将在这里动态加载 -->
                         </div>
+                        
+                        <!-- 分页导航 -->
+                        <nav aria-label="教授列表分页" id="pagination-nav" style="display: none;">
+                            <ul class="pagination justify-content-center" id="pagination-controls">
+                                <!-- 分页按钮将在这里动态生成 -->
+                            </ul>
+                        </nav>
                     </div>
                 </div>
             </div>
@@ -99,7 +123,7 @@
 
     <!-- 导入CSV模态框 -->
     <div class="modal fade" id="importModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">导入教授信息</h5>
@@ -116,7 +140,10 @@
                                 <strong>可选字段：</strong>研究领域, 教授介绍
                             </div>
                         </div>
-                        <div class="mb-3">
+                        
+                        <!-- CSV预览区域 -->
+                        <div id="csv-preview" class="mb-3" style="max-width: 100%; overflow-x: auto;"></div>
+                        <div id="import-options" class="mb-3" style="display: none; max-width: 100%; overflow-x: auto;">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="skip-duplicates" checked>
                                 <label class="form-check-label" for="skip-duplicates">

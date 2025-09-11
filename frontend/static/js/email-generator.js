@@ -339,21 +339,54 @@ window.generateDocumentEmail = async () => {
             // 检查是否选择了多个学院
             if (departmentSelect.value === 'multiple') {
                 // 检查是否已经加载了教授列表（显示教授复选框）
-                const professorCheckboxes = document.querySelectorAll('.professor-checkbox:checked');
-                if (professorCheckboxes.length > 0) {
-                    // 如果有选中的教授复选框，使用教授ID
-                    selectedProfessors = Array.from(professorCheckboxes).map(cb => cb.value);
+                const pm = window.ProfessorManager;
+                if (pm && pm.professorCheckStates) {
+                    // 优先使用全局选中状态映射（包含被筛选隐藏的教授）
+                    selectedProfessors = Object.entries(pm.professorCheckStates)
+                        .filter(([_, checked]) => checked)
+                        .map(([id]) => id);
                 } else {
-                    // 如果没有教授复选框，检查学院复选框
-                    const selectedDepartmentCheckboxes = document.querySelectorAll('.department-checkbox:checked');
-                    if (selectedDepartmentCheckboxes.length === 0) {
-                        Utils.showToast('请至少选择一个学院', 'error');
-                        return;
+                    // 回退：仅在没有状态映射时使用 DOM 查询
+                    const professorCheckboxes = document.querySelectorAll('#doc-batch-professors-list .professor-checkbox:checked');
+                    if (professorCheckboxes.length > 0) {
+                        selectedProfessors = Array.from(professorCheckboxes).map(cb => cb.value);
                     }
-                    selectedProfessors = Array.from(selectedDepartmentCheckboxes).map(cb => cb.value);
+                }
+                
+                if (selectedProfessors.length === 0) {
+                    Utils.showToast('请至少选择一位教授', 'error');
+                    return;
                 }
             } else {
-                selectedProfessors = [departmentSelect.value]; // 单个学院
+                // 单个学院选择的情况，也需要确保用户已经加载了教授列表
+                const pm = window.ProfessorManager;
+                if (pm && pm.professorCheckStates) {
+                    // 使用状态映射判断是否已经加载了教授列表
+                    const hasLoaded = pm.originalProfessors && pm.originalProfessors.length > 0;
+                    if (!hasLoaded) {
+                        Utils.showToast('请先选择学院后加载教授列表，然后选择具体的教授', 'error');
+                        return;
+                    }
+                    // 使用全局选中状态映射
+                    selectedProfessors = Object.entries(pm.professorCheckStates)
+                        .filter(([_, checked]) => checked)
+                        .map(([id]) => id);
+                } else {
+                    // 回退到 DOM 查询
+                    const professorCheckboxes = document.querySelectorAll('#doc-batch-professors-list .professor-checkbox');
+                    if (professorCheckboxes.length === 0) {
+                        Utils.showToast('请先选择学院后加载教授列表，然后选择具体的教授', 'error');
+                        return;
+                    }
+                    // 获取所有选中的教授ID，不管是否在当前筛选结果中可见（注意：若使用 DOM，此时仅包含当前显示的）
+                    const checkedProfessors = document.querySelectorAll('#doc-batch-professors-list .professor-checkbox:checked');
+                    selectedProfessors = Array.from(checkedProfessors).map(cb => cb.value);
+                }
+                
+                if (selectedProfessors.length === 0) {
+                    Utils.showToast('请至少选择一位教授', 'error');
+                    return;
+                }
             }
         } else {
             const professorSelect = document.getElementById('doc-select-professor');
@@ -426,29 +459,20 @@ function displayDocumentEmail(emailPreviews) {
     }
     window.EmailGenerator.currentEmailPreviews = emailPreviews;
     
-    // 生成多个邮件预览的HTML，只显示前两封的完整内容
-    const emailsHtml = emailPreviews.map((emailData, index) => {
-        const showFullContent = index < 2 || (window.EmailGenerator.showDetailedEmail && window.EmailGenerator.showDetailedEmail.has(index)); // 显示前两封或用户点击查看详情的邮件
-        
+    // 生成邮件预览的HTML，只显示第一封的完整内容
+    const emailsHtml = emailPreviews.slice(0, 1).map((emailData, index) => {
         return `
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">
                     <i class="bi bi-envelope"></i> 发送给 ${emailData.professor_name} (${emailData.professor_university})
                 </h6>
-                <div class="btn-group btn-group-sm">
-                    ${index >= 2 ? `
-                    <button class="btn btn-outline-info" onclick="window.EmailGenerator.toggleEmailContent(${index})">
-                        <i class="bi bi-eye${showFullContent ? '-slash' : ''}"></i> ${showFullContent ? '收起详情' : '查看详情'}
-                    </button>` : ''}
-                </div>
             </div>
             <div class="card-body">
                 <div class="mb-3">
                     <label class="form-label fw-bold">主题:</label>
                     <div class="border rounded p-2 bg-light">${emailData.subject || '无主题'}</div>
                 </div>
-                ${showFullContent ? `
                 <div class="mb-3">
                     <label class="form-label fw-bold">内容:</label>
                     <div class="document-content" style="min-height: 200px; max-height: 400px; overflow-y: auto;">${emailData.content || '无内容'}</div>
@@ -466,21 +490,15 @@ function displayDocumentEmail(emailPreviews) {
                         `).join('')}
                     </div>
                 </div>` : ''}
-                ` : `
-                <div class="mb-3">
-                    <div class="alert alert-info mb-0">
-                        <i class="bi bi-info-circle"></i> 点击"查看详情"按钮查看完整邮件内容
-                    </div>
-                </div>`}
             </div>
         </div>
         `;
     }).join('');
-    
+
     const html = `
         <div class="mb-3">
             <div class="alert alert-info">
-                <i class="bi bi-info-circle"></i> 共生成 ${emailPreviews.length} 封邮件预览
+                <i class="bi bi-info-circle"></i> 共生成 ${emailPreviews.length} 封邮件预览，但仅展示一封
             </div>
             ${emailsHtml}
         </div>

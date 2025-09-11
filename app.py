@@ -86,17 +86,63 @@ def create_app():
     def professors():
         """教授信息管理"""
         if request.method == 'GET':
-            professors = Professor.query.all()
-            return jsonify([{
-                'id': p.id,
-                'name': p.name,
-                'email': p.email,
-                'university': p.university,
-                'department': p.department,
-                'research_area': p.research_area,
-                'introduction': p.introduction,
-                'created_at': p.created_at.isoformat()
-            } for p in professors])
+            # 获取分页参数
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 20, type=int)
+            search = request.args.get('search', '', type=str)
+            university = request.args.get('university', '', type=str)
+            department = request.args.get('department', '', type=str)
+            
+            # 限制每页最大数量
+            per_page = min(per_page, 100)
+            
+            # 构建查询
+            query = Professor.query
+            
+            # 添加搜索条件
+            if search:
+                query = query.filter(
+                    Professor.name.contains(search) |
+                    Professor.email.contains(search)
+                )
+            
+            if university:
+                query = query.filter(Professor.university == university)
+                
+            if department:
+                query = query.filter(Professor.department == department)
+            
+            # 执行分页查询
+            pagination = query.paginate(
+                page=page, 
+                per_page=per_page, 
+                error_out=False
+            )
+            
+            professors = pagination.items
+            
+            return jsonify({
+                'professors': [{
+                    'id': p.id,
+                    'name': p.name,
+                    'email': p.email,
+                    'university': p.university,
+                    'department': p.department,
+                    'research_area': p.research_area,
+                    'introduction': p.introduction,
+                    'created_at': p.created_at.isoformat()
+                } for p in professors],
+                'pagination': {
+                    'page': pagination.page,
+                    'per_page': pagination.per_page,
+                    'total': pagination.total,
+                    'pages': pagination.pages,
+                    'has_prev': pagination.has_prev,
+                    'has_next': pagination.has_next,
+                    'prev_num': pagination.prev_num,
+                    'next_num': pagination.next_num
+                }
+            })
         
         elif request.method == 'POST':
             try:
@@ -119,6 +165,21 @@ def create_app():
                 else:
                     logger.error(f'添加教授失败: {str(e)}')
                     return jsonify({'error': '添加教授失败，请稍后重试'}), 500
+    
+    @app.route('/api/professors/all', methods=['GET'])
+    def professors_all():
+        """获取所有教授信息（不分页）"""
+        professors = Professor.query.all()
+        return jsonify([{
+            'id': p.id,
+            'name': p.name,
+            'email': p.email,
+            'university': p.university,
+            'department': p.department,
+            'research_area': p.research_area,
+            'introduction': p.introduction,
+            'created_at': p.created_at.isoformat()
+        } for p in professors])
     
     @app.route('/api/professors/<int:professor_id>', methods=['GET', 'PUT', 'DELETE'])
     def professor_detail(professor_id):
@@ -404,22 +465,119 @@ def create_app():
     
     @app.route('/api/email-records', methods=['GET'])
     def email_records():
-        """获取邮件发送记录"""
-        records = EmailRecord.query.order_by(EmailRecord.created_at.desc()).all()
-        return jsonify([{
-            'id': r.id,
-            'professor_name': r.professor.name,
-            'professor_email': r.professor.email,
-            'professor_university': r.professor.university,
-            'professor_department': r.professor.department,
-            'subject': r.subject,
-            'content': r.content,
-            'status': r.status,
-            'sender_name': r.sender_name,
-            'sender_email': r.sender_email,
-            'created_at': r.created_at.isoformat(),
-            'sent_at': r.sent_at.isoformat() if r.sent_at else None
-        } for r in records])
+        """获取邮件发送记录（支持分页和筛选）"""
+        try:
+            # 获取分页参数
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 20, type=int)
+            
+            # 获取筛选参数
+            sender_name = request.args.get('sender_name', '').strip()
+            university = request.args.get('university', '').strip()
+            department = request.args.get('department', '').strip()
+            professor_name = request.args.get('professor_name', '').strip()
+            status = request.args.get('status', '').strip()
+            date_from = request.args.get('date_from', '').strip()
+            date_to = request.args.get('date_to', '').strip()
+            content_keyword = request.args.get('content_keyword', '').strip()
+            
+            # 构建查询
+            query = EmailRecord.query.join(Professor)
+            
+            # 应用筛选条件
+            if sender_name:
+                query = query.filter(EmailRecord.sender_name.ilike(f'%{sender_name}%'))
+            if university:
+                query = query.filter(Professor.university.ilike(f'%{university}%'))
+            if department:
+                query = query.filter(Professor.department.ilike(f'%{department}%'))
+            if professor_name:
+                query = query.filter(Professor.name.ilike(f'%{professor_name}%'))
+            if status:
+                query = query.filter(EmailRecord.status == status)
+            if content_keyword:
+                query = query.filter(EmailRecord.content.ilike(f'%{content_keyword}%'))
+            
+            # 日期筛选
+            if date_from:
+                try:
+                    date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+                    query = query.filter(EmailRecord.created_at >= date_from_obj)
+                except ValueError:
+                    pass
+            if date_to:
+                try:
+                    date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
+                    # 包含整天，所以加上23:59:59
+                    from datetime import timedelta
+                    date_to_obj = date_to_obj + timedelta(days=1) - timedelta(seconds=1)
+                    query = query.filter(EmailRecord.created_at <= date_to_obj)
+                except ValueError:
+                    pass
+            
+            # 按创建时间降序排列
+            query = query.order_by(EmailRecord.created_at.desc())
+            
+            # 执行分页查询
+            pagination = query.paginate(
+                page=page,
+                per_page=per_page,
+                error_out=False
+            )
+            
+            records = pagination.items
+            
+            return jsonify({
+                'records': [{
+                    'id': r.id,
+                    'professor_name': r.professor.name,
+                    'professor_email': r.professor.email,
+                    'professor_university': r.professor.university,
+                    'professor_department': r.professor.department,
+                    'subject': r.subject,
+                    'content': r.content,
+                    'status': r.status,
+                    'sender_name': r.sender_name,
+                    'sender_email': r.sender_email,
+                    'created_at': r.created_at.isoformat(),
+                    'sent_at': r.sent_at.isoformat() if r.sent_at else None
+                } for r in records],
+                'pagination': {
+                    'page': pagination.page,
+                    'pages': pagination.pages,
+                    'per_page': pagination.per_page,
+                    'total': pagination.total,
+                    'has_next': pagination.has_next,
+                    'has_prev': pagination.has_prev
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"获取邮件记录失败: {e}")
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/email-records/all', methods=['GET'])
+    def email_records_all():
+        """获取所有邮件记录（用于筛选选项）"""
+        try:
+            records = EmailRecord.query.join(Professor).order_by(EmailRecord.created_at.desc()).all()
+            return jsonify([{
+                'id': r.id,
+                'professor_name': r.professor.name,
+                'professor_email': r.professor.email,
+                'professor_university': r.professor.university,
+                'professor_department': r.professor.department,
+                'subject': r.subject,
+                'content': r.content,
+                'status': r.status,
+                'sender_name': r.sender_name,
+                'sender_email': r.sender_email,
+                'created_at': r.created_at.isoformat(),
+                'sent_at': r.sent_at.isoformat() if r.sent_at else None
+            } for r in records])
+        except Exception as e:
+            logger.error(f"获取所有邮件记录失败: {e}")
+            return jsonify({'error': str(e)}), 500
     
     @app.route('/api/email-records/<int:record_id>', methods=['GET'])
     def email_record_detail(record_id):
@@ -468,8 +626,8 @@ def create_app():
             if file.filename == '':
                 return jsonify({'error': '没有选择文件'}), 400
             
-            # 验证文件
-            is_valid, message = import_service.validate_csv_file(file)
+            # 验证文件（预览阶段允许无数据行，但必须包含必需表头）
+            is_valid, message = import_service.validate_csv_file(file, allow_empty=True)
             if not is_valid:
                 return jsonify({'error': message}), 400
             

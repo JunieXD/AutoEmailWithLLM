@@ -4,6 +4,20 @@
 
 class RecordsManager {
     constructor() {
+        this.currentPage = 1;
+        this.perPage = 5;
+        this.totalPages = 1;
+        this.totalRecords = 0;
+        this.currentFilters = {
+            sender_name: '',
+            university: '',
+            department: '',
+            professor_name: '',
+            status: '',
+            date_from: '',
+            date_to: '',
+            content_keyword: ''
+        };
         this.allRecords = [];
         this.filteredRecords = [];
         this.initEventListeners();
@@ -14,19 +28,65 @@ class RecordsManager {
         // 这里可以添加其他事件监听器
     }
 
-    // 加载邮件记录
-    async loadEmailRecords() {
+    // 加载邮件记录（分页）
+    async loadEmailRecords(page = 1) {
         try {
-            const records = await Utils.apiRequest('/api/email-records');
-            this.allRecords = records;
-            this.filteredRecords = records;
-            this.displayEmailRecords(records);
-            this.updateRecordsCount(records.length);
-            this.populateUniversityFilter(records);
-            this.populateDepartmentFilter(records);
+            this.currentPage = page;
+            
+            // 构建查询参数
+            const params = new URLSearchParams({
+                page: this.currentPage,
+                per_page: this.perPage,
+                sender_name: this.currentFilters.sender_name,
+                university: this.currentFilters.university,
+                department: this.currentFilters.department,
+                professor_name: this.currentFilters.professor_name,
+                status: this.currentFilters.status,
+                date_from: this.currentFilters.date_from,
+                date_to: this.currentFilters.date_to,
+                content_keyword: this.currentFilters.content_keyword
+            });
+            
+            const response = await Utils.apiRequest(`/api/email-records?${params}`);
+            
+            // 更新分页信息
+            this.totalPages = response.pagination.pages;
+            this.totalRecords = response.pagination.total;
+            
+            // 显示邮件记录
+            this.displayEmailRecords(response.records);
+            
+            // 更新分页控件
+            this.updatePaginationInfo();
+            this.updatePaginationControls();
+            
+            // 如果是第一页，更新筛选选项（需要获取所有数据）
+            if (page === 1) {
+                this.updateFiltersFromAllData();
+            }
+            
+            console.log('邮件记录加载成功:', response.records.length, '条记录，共', this.totalRecords, '条');
         } catch (error) {
             console.error('加载邮件记录失败:', error);
             Utils.showToast('加载邮件记录失败: ' + error.message, 'error');
+        }
+    }
+    
+    // 从所有数据更新筛选选项
+    async updateFiltersFromAllData() {
+        try {
+            const allRecords = await Utils.apiRequest('/api/email-records/all');
+            
+            // 更新全局变量（用于其他功能）
+            this.allRecords = allRecords;
+            
+            // 更新筛选选项
+            this.populateUniversityFilter(allRecords);
+            this.populateDepartmentFilter(allRecords);
+            this.populateSenderFilter(allRecords);
+            this.populateProfessorFilter(allRecords);
+        } catch (error) {
+            console.error('Error loading all records for filters:', error);
         }
     }
 
@@ -42,6 +102,11 @@ class RecordsManager {
                     <p class="mt-2">暂无邮件记录</p>
                 </div>
             `;
+            // 隐藏分页导航
+            const paginationNav = document.getElementById('records-pagination-nav');
+            if (paginationNav) {
+                paginationNav.style.display = 'none';
+            }
             return;
         }
 
@@ -92,13 +157,75 @@ class RecordsManager {
         });
 
         container.innerHTML = html;
+        
+        // 显示分页导航（如果有多页）
+        const paginationNav = document.getElementById('records-pagination-nav');
+        if (paginationNav) {
+            paginationNav.style.display = this.totalPages > 1 ? 'block' : 'none';
+        }
     }
 
-    // 更新记录数量显示
-    updateRecordsCount(count) {
-        const countElement = document.getElementById('records-count');
-        if (countElement) {
-            countElement.textContent = `共 ${count} 条记录`;
+    // 更新分页信息显示
+    updatePaginationInfo() {
+        const paginationInfo = document.getElementById('records-pagination-info');
+        if (paginationInfo) {
+            const start = (this.currentPage - 1) * this.perPage + 1;
+            const end = Math.min(this.currentPage * this.perPage, this.totalRecords);
+            paginationInfo.textContent = `显示 ${start}-${end} 条，共 ${this.totalRecords} 条记录`;
+        }
+    }
+    
+    // 更新分页控件
+    updatePaginationControls() {
+        const paginationContainer = document.getElementById('records-pagination-controls');
+        if (!paginationContainer) return;
+
+        let html = '';
+        
+        // 上一页按钮
+        html += `<li class="page-item ${this.currentPage === 1 ? 'disabled' : ''}">`;
+        html += `<a class="page-link" href="#" onclick="window.RecordsManager.loadEmailRecords(${this.currentPage - 1})" ${this.currentPage === 1 ? 'tabindex="-1"' : ''}>上一页</a>`;
+        html += '</li>';
+
+        // 页码按钮
+        const startPage = Math.max(1, this.currentPage - 2);
+        const endPage = Math.min(this.totalPages, this.currentPage + 2);
+
+        if (startPage > 1) {
+            html += '<li class="page-item"><a class="page-link" href="#" onclick="window.RecordsManager.loadEmailRecords(1)">1</a></li>';
+            if (startPage > 2) {
+                html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+            }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            html += `<li class="page-item ${i === this.currentPage ? 'active' : ''}">`;
+            html += `<a class="page-link" href="#" onclick="window.RecordsManager.loadEmailRecords(${i})">${i}</a>`;
+            html += '</li>';
+        }
+
+        if (endPage < this.totalPages) {
+            if (endPage < this.totalPages - 1) {
+                html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+            }
+            html += `<li class="page-item"><a class="page-link" href="#" onclick="window.RecordsManager.loadEmailRecords(${this.totalPages})">${this.totalPages}</a></li>`;
+        }
+
+        // 下一页按钮
+        html += `<li class="page-item ${this.currentPage === this.totalPages ? 'disabled' : ''}">`;
+        html += `<a class="page-link" href="#" onclick="window.RecordsManager.loadEmailRecords(${this.currentPage + 1})" ${this.currentPage === this.totalPages ? 'tabindex="-1"' : ''}>下一页</a>`;
+        html += '</li>';
+
+        paginationContainer.innerHTML = html;
+    }
+    
+    // 改变每页显示数量
+    changePerPage() {
+        const perPageSelect = document.getElementById('records-per-page-select');
+        if (perPageSelect) {
+            this.perPage = parseInt(perPageSelect.value);
+            this.currentPage = 1; // 重置到第一页
+            this.loadEmailRecords(1);
         }
     }
 
@@ -135,6 +262,42 @@ class RecordsManager {
             option.value = department;
             option.textContent = department;
             departmentSelect.appendChild(option);
+        });
+    }
+
+    // 填充发送人筛选选项
+    populateSenderFilter(records) {
+        const senderSelect = document.getElementById('filter-sender');
+        if (!senderSelect) return;
+
+        const senders = [...new Set(records.map(r => r.sender_name).filter(s => s))].sort();
+        
+        // 保留默认选项
+        senderSelect.innerHTML = '<option value="">所有发送人</option>';
+        
+        senders.forEach(sender => {
+            const option = document.createElement('option');
+            option.value = sender;
+            option.textContent = sender;
+            senderSelect.appendChild(option);
+        });
+    }
+
+    // 填充教授筛选选项
+    populateProfessorFilter(records) {
+        const professorSelect = document.getElementById('filter-professor');
+        if (!professorSelect) return;
+
+        const professors = [...new Set(records.map(r => r.professor_name).filter(p => p))].sort();
+        
+        // 保留默认选项
+        professorSelect.innerHTML = '<option value="">所有教授</option>';
+        
+        professors.forEach(professor => {
+            const option = document.createElement('option');
+            option.value = professor;
+            option.textContent = professor;
+            professorSelect.appendChild(option);
         });
     }
 
@@ -176,6 +339,34 @@ class RecordsManager {
         
         // 清理多余的空白字符
         return plainText.replace(/\s+/g, ' ').trim();
+    }
+
+    // 应用筛选
+    applyFilters() {
+        const senderFilter = document.getElementById('filter-sender')?.value || '';
+        const universityFilter = document.getElementById('filter-university')?.value || '';
+        const departmentFilter = document.getElementById('filter-department')?.value || '';
+        const professorFilter = document.getElementById('filter-professor')?.value || '';
+        const statusFilter = document.getElementById('filter-status')?.value || '';
+        const dateFromFilter = document.getElementById('filter-date-from')?.value || '';
+        const dateToFilter = document.getElementById('filter-date-to')?.value || '';
+        const contentFilter = document.getElementById('filter-content')?.value || '';
+
+        // 更新当前筛选条件
+        this.currentFilters = {
+            sender_name: senderFilter,
+            university: universityFilter,
+            department: departmentFilter,
+            professor_name: professorFilter,
+            status: statusFilter,
+            date_from: dateFromFilter,
+            date_to: dateToFilter,
+            content_keyword: contentFilter
+        };
+
+        // 重置到第一页并重新加载
+        this.currentPage = 1;
+        this.loadEmailRecords(1);
     }
 
     // 筛选邮件记录
@@ -257,9 +448,21 @@ class RecordsManager {
         // 重置学院选项为所有学院
         this.populateDepartmentFilter(this.allRecords);
 
-        this.filteredRecords = this.allRecords;
-        this.displayEmailRecords(this.filteredRecords);
-        this.updateRecordsCount(this.filteredRecords.length);
+        // 清除筛选条件
+        this.currentFilters = {
+            sender_name: '',
+            university: '',
+            department: '',
+            professor_name: '',
+            status: '',
+            date_from: '',
+            date_to: '',
+            content_keyword: ''
+        };
+        
+        // 重置到第一页并重新加载
+        this.currentPage = 1;
+        this.loadEmailRecords(1);
     }
 
     // 渲染邮件内容

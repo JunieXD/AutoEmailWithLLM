@@ -73,16 +73,16 @@
                 <div class="col-md-4">
                     <div class="card bg-light">
                         <div class="card-body text-center">
-                            <h3 class="text-success" id="total-emails">-</h3>
-                            <p class="mb-0">邮件总数</p>
+                            <h3 class="text-info" id="total-users">-</h3>
+                            <p class="mb-0">用户总数</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card bg-light">
                         <div class="card-body text-center">
-                            <h3 class="text-info" id="total-users">-</h3>
-                            <p class="mb-0">用户总数</p>
+                            <h3 class="text-success" id="total-emails">-</h3>
+                            <p class="mb-0">今日发送数/累计发送数</p>
                         </div>
                     </div>
                 </div>
@@ -95,7 +95,7 @@
 // 加载统计数据
 document.addEventListener('DOMContentLoaded', function() {
     // 加载教授统计
-    fetch('/api/professors')
+    fetch('/api/professors/all')
         .then(response => response.json())
         .then(data => {
             document.getElementById('total-professors').textContent = data.length;
@@ -105,22 +105,41 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('total-professors').textContent = '0';
         });
     
-    // 加载邮件记录统计
-    fetch('/api/email-records')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('total-emails').textContent = data.length;
-        })
-        .catch(error => {
+    // 加载邮件记录统计（显示 今日发送数/累计发送数）
+    (() => {
+        const pad2 = (n) => String(n).padStart(2, '0');
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+
+        const getTotalFromResponse = (data) => {
+            if (data && data.pagination && typeof data.pagination.total === 'number') return data.pagination.total;
+            if (Array.isArray(data)) return data.length;
+            if (Array.isArray(data.records)) return data.records.length;
+            return 0;
+        };
+
+        const totalUrl = `/api/email-records?status=sent&per_page=1`;
+        const todayUrl = `/api/email-records?status=sent&date_from=${todayStr}&date_to=${todayStr}&per_page=1`;
+
+        Promise.all([
+            fetch(totalUrl).then(r => r.json()).then(getTotalFromResponse),
+            fetch(todayUrl).then(r => r.json()).then(getTotalFromResponse),
+        ]).then(([totalSent, todaySent]) => {
+            const el = document.getElementById('total-emails');
+            if (el) el.textContent = `${todaySent}/${totalSent}`;
+        }).catch(error => {
             console.error('Error loading email records:', error);
-            document.getElementById('total-emails').textContent = '0';
+            const el = document.getElementById('total-emails');
+            if (el) el.textContent = '0/0';
         });
+    })();
     
     // 加载用户总数
     fetch('/api/users')
         .then(response => response.json())
         .then(data => {
-            document.getElementById('total-users').textContent = data.length;
+            const totalUsers = Array.isArray(data) ? data.length : (Array.isArray(data.users) ? data.users.length : 0);
+            document.getElementById('total-users').textContent = totalUsers;
         })
         .catch(error => {
             console.error('Error loading users:', error);
