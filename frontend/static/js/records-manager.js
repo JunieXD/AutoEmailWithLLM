@@ -407,7 +407,14 @@ class RecordsManager {
             }
 
             // 日期筛选
-            const recordDate = new Date(record.sent_at || record.created_at).toLocaleDateString('en-CA'); // 使用本地时区的日期，格式为YYYY-MM-DD
+            const rawDateStr = record.sent_at || record.created_at;
+            let parseStr = rawDateStr;
+            // 若为无时区ISO（如 2024-09-11T12:34:56 或带毫秒），补上Z按UTC解析
+            const isoNoTZ = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+            if (typeof parseStr === 'string' && isoNoTZ.test(parseStr)) {
+                parseStr += 'Z';
+            }
+            const recordDate = new Date(parseStr).toLocaleDateString('en-CA'); // 使用本地时区的日期，格式为YYYY-MM-DD
             if (dateFromFilter && recordDate < dateFromFilter) {
                 return false;
             }

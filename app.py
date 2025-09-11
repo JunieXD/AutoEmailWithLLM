@@ -16,9 +16,26 @@ from backend.user_service import UserService
 from backend.document_service import DocumentService
 from backend.models.user_profile import UserProfile
 from backend.models.user_file import UserFile
+from backend.utils.timezone_utils import get_shanghai_utcnow, SHANGHAI_TZ
+import pytz
 
 # 移除原本的 basicConfig，统一使用 Config.init_app 进行日志初始化
 logger = logging.getLogger(__name__)
+
+# 兼容旧数据的 sent_at 序列化（旧数据可能以上海本地时间的naive保存）
+def _serialize_sent_at(record):
+    dt = record.sent_at
+    if not dt:
+        return None
+    try:
+        # 如果是naive时间，可能是旧数据（本地上海时间），需要转为UTC-naive字符串
+        if dt.tzinfo is None:
+            # 假设旧数据为上海本地时间
+            return SHANGHAI_TZ.localize(dt).astimezone(pytz.UTC).replace(tzinfo=None).isoformat()
+        # 有tz信息则统一转为UTC-naive
+        return dt.astimezone(pytz.UTC).replace(tzinfo=None).isoformat()
+    except Exception:
+        return dt.isoformat()
 
 def create_app():
     app = Flask(__name__, 
@@ -366,7 +383,7 @@ def create_app():
                 status='sent' if success else 'failed',
                 sender_name=sender_user.name,
                 sender_email=sender_user.email,
-                sent_at=datetime.now() if success else None
+                sent_at=get_shanghai_utcnow() if success else None
             )
             db.session.add(email_record)
             db.session.commit()
@@ -635,7 +652,7 @@ def create_app():
                         status='sent' if success else 'failed',
                         sender_name=sender_user.name,
                         sender_email=sender_user.email,
-                        sent_at=datetime.now() if success else None
+                        sent_at=get_shanghai_utcnow() if success else None
                     )
                     db.session.add(email_record)
 
@@ -759,7 +776,7 @@ def create_app():
                     'sender_name': r.sender_name,
                     'sender_email': r.sender_email,
                     'created_at': r.created_at.isoformat(),
-                    'sent_at': r.sent_at.isoformat() if r.sent_at else None
+                    'sent_at': _serialize_sent_at(r)
                 } for r in records],
                 'pagination': {
                     'page': pagination.page,
@@ -792,7 +809,7 @@ def create_app():
                 'sender_name': r.sender_name,
                 'sender_email': r.sender_email,
                 'created_at': r.created_at.isoformat(),
-                'sent_at': r.sent_at.isoformat() if r.sent_at else None
+                'sent_at': _serialize_sent_at(r)
             } for r in records])
         except Exception as e:
             logger.error(f"获取所有邮件记录失败: {e}")
@@ -815,9 +832,9 @@ def create_app():
                 'sender_name': record.sender_name,
                 'sender_email': record.sender_email,
                 'recipient_email': record.professor.email,
-                'send_time': record.sent_at.isoformat() if record.sent_at else record.created_at.isoformat(),
+                'send_time': _serialize_sent_at(record) if record.sent_at else record.created_at.isoformat(),
                 'created_at': record.created_at.isoformat(),
-                'sent_at': record.sent_at.isoformat() if record.sent_at else None
+                'sent_at': _serialize_sent_at(record)
             })
         except Exception as e:
             logger.error(f"获取邮件记录详情失败: {str(e)}")
@@ -1418,7 +1435,7 @@ def create_app():
                         status='sent' if success else 'failed',
                         sender_name=sender_user.name,
                         sender_email=sender_user.email,
-                        sent_at=datetime.now() if success else None
+                        sent_at=get_shanghai_utcnow() if success else None
                     )
                     db.session.add(email_record)
                     
