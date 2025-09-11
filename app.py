@@ -1416,7 +1416,9 @@ def create_app():
                     sender_config = {
                         'email': sender_user.email,
                         'name': sender_user.name,
-                        'password': sender_user.email_password
+                        'password': sender_user.email_password,
+                        'smtp_server': sender_user.smtp_server,
+                        'smtp_port': sender_user.smtp_port
                     }
                     
                     success = email_service.send_email(
