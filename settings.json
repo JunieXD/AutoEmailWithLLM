@@ -1,7 +1,0 @@
-{
-    "log_settings": {
-        "log_level": "INFO",
-        "log_file": "app.log",
-        "console_output": true
-    }
-}
