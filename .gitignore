@@ -263,3 +263,6 @@ import_data/
 # 测试数据
 test_data/
 sample_data/
+
+# 配置文件
+settings.json
