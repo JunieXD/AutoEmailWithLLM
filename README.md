@@ -31,19 +31,43 @@
 AutoEmailSender/
 ├── app.py                       # Flask 入口 & 路由
 ├── backend/
+│   ├── __init__.py
 │   ├── config.py                # 应用&邮件配置（可读环境变量）
 │   ├── database.py              # 数据库初始化与模型注册
+│   ├── document_service.py      # 文档内容读取&提取
 │   ├── email_service.py         # 发送邮件逻辑
 │   ├── import_service.py        # CSV 导入/预览/导出
-│   ├── document_service.py      # 文档内容读取&提取
 │   ├── user_service.py          # 用户与文件管理逻辑
-│   └── models/                  # SQLAlchemy 模型
-│       ├── user_file.py
-│       └── user_profile.py
+│   ├── models/                  # SQLAlchemy 模型
+│   │   ├── user_file.py
+│   │   └── user_profile.py
+│   └── utils/
+│       └── timezone_utils.py    # 时区工具
+├── routes/                      # 视图路由（API 与页面）
+│   ├── __init__.py
+│   ├── email_routes.py
+│   ├── file_routes.py
+│   ├── import_routes.py
+│   ├── page_routes.py
+│   ├── professor_routes.py
+│   ├── record_routes.py
+│   ├── settings_routes.py
+│   └── user_routes.py
 ├── frontend/
-│   ├── templates/               # 页面：index, professors, records, settings, ...
-│   └── static/                  # 静态资源
-└── pyproject.toml               # 依赖声明
+│   ├── templates/               # 页面模板
+│   │   ├── base.html
+│   │   ├── email_generator.html
+│   │   ├── index.html
+│   │   ├── professors.html
+│   │   ├── records.html
+│   │   ├── settings.html
+│   │   └── user_management.html
+│   └── static/                  # 静态资源（css/fonts/js）
+│       ├── css/
+│       ├── fonts/
+│       └── js/
+├── settings.json                # 应用运行时设置
+├── pyproject.toml               # 依赖声明
 ```
 
 
