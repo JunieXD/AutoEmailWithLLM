@@ -8,6 +8,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import sys
 import re
+import json
 
 class Config:
     """应用配置类"""
@@ -36,6 +37,36 @@ class Config:
     LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
     LOG_MAX_BYTES = int(os.environ.get('LOG_MAX_BYTES') or 5 * 1024 * 1024)
     LOG_BACKUP_COUNT = int(os.environ.get('LOG_BACKUP_COUNT') or 5)
+    
+    # 配置文件路径
+    SETTINGS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings.json')
+    
+    @staticmethod
+    def load_settings():
+        """从配置文件加载设置"""
+        try:
+            if os.path.exists(Config.SETTINGS_FILE):
+                with open(Config.SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"加载配置文件失败: {e}")
+        return {}
+    
+    @staticmethod
+    def save_settings(settings):
+        """保存设置到配置文件"""
+        try:
+            # 读取现有配置
+            existing_settings = Config.load_settings()
+            # 更新配置
+            existing_settings.update(settings)
+            # 保存到文件
+            with open(Config.SETTINGS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(existing_settings, f, indent=4, ensure_ascii=False)
+            return True
+        except Exception as e:
+            print(f"保存配置文件失败: {e}")
+            return False
 
     @staticmethod
     def init_app(app):
@@ -44,11 +75,23 @@ class Config:
         os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
         os.makedirs(Config.LOG_DIR, exist_ok=True)
 
-        # 计算日志级别
-        level_name = app.config.get('LOG_LEVEL', Config.LOG_LEVEL)
+        # 从配置文件加载日志设置
+        settings = Config.load_settings()
+        log_settings = settings.get('log_settings', {})
+        
+        # 优先使用配置文件中的设置，其次是app.config，最后是默认值
+        level_name = log_settings.get('log_level') or app.config.get('LOG_LEVEL', Config.LOG_LEVEL)
+        log_file_name = log_settings.get('log_file') or app.config.get('LOG_FILE', Config.LOG_FILE)
+        console_output = log_settings.get('console_output')
+        if console_output is None:
+            console_output = app.config.get('CONSOLE_OUTPUT', Config.CONSOLE_OUTPUT)
+        
+        # 更新app.config以保持一致性
+        app.config['LOG_LEVEL'] = level_name
+        app.config['LOG_FILE'] = log_file_name
+        app.config['CONSOLE_OUTPUT'] = console_output
+        
         level = getattr(logging, str(level_name).upper(), logging.INFO)
-        log_file_name = app.config.get('LOG_FILE', Config.LOG_FILE)
-        console_output = app.config.get('CONSOLE_OUTPUT', Config.CONSOLE_OUTPUT)
 
         # 清理根日志器已有的处理器，避免重复日志
         root_logger = logging.getLogger()

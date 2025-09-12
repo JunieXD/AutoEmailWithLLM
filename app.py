@@ -22,20 +22,24 @@ import pytz
 # 移除原本的 basicConfig，统一使用 Config.init_app 进行日志初始化
 logger = logging.getLogger(__name__)
 
-# 兼容旧数据的 sent_at 序列化（旧数据可能以上海本地时间的naive保存）
-def _serialize_sent_at(record):
-    dt = record.sent_at
+# 统一的时间序列化函数
+def _serialize_datetime(dt):
+    """将datetime对象序列化为UTC时间字符串"""
     if not dt:
         return None
     try:
-        # 如果是naive时间，可能是旧数据（本地上海时间），需要转为UTC-naive字符串
+        # 如果是naive时间，由于get_shanghai_utcnow()返回的就是UTC时间（只是没有时区信息）
+        # 所以直接序列化即可
         if dt.tzinfo is None:
-            # 假设旧数据为上海本地时间
-            return SHANGHAI_TZ.localize(dt).astimezone(pytz.UTC).replace(tzinfo=None).isoformat()
+            return dt.isoformat()
         # 有tz信息则统一转为UTC-naive
         return dt.astimezone(pytz.UTC).replace(tzinfo=None).isoformat()
     except Exception:
         return dt.isoformat()
+
+# 兼容旧数据的 sent_at 序列化（旧数据可能以上海本地时间的naive保存）
+def _serialize_sent_at(record):
+    return _serialize_datetime(record.sent_at)
 
 def create_app():
     app = Flask(__name__, 
@@ -297,9 +301,10 @@ def create_app():
                 if not sender_user:
                     return jsonify({'error': '选择的发送用户不存在或未激活'}), 400
             else:
-                sender_user = user_service.get_default_user()
+                # 如果没有指定发送用户，选择第一个可用用户
+                sender_user = UserProfile.query.filter_by(is_active=True).first()
                 if not sender_user:
-                    return jsonify({'error': '请先设置默认用户'}), 400
+                    return jsonify({'error': '请先创建用户'}), 400
             
             # 获取邮件内容
             content_source = data.get('content_source', 'generated')
@@ -566,9 +571,10 @@ def create_app():
                 if not sender_user:
                     return jsonify({'error': '选择的发送用户不存在或未激活'}), 400
             else:
-                sender_user = user_service.get_default_user()
+                # 如果没有指定发送用户，选择第一个可用用户
+                sender_user = UserProfile.query.filter_by(is_active=True).first()
                 if not sender_user:
-                    return jsonify({'error': '请先设置默认用户'}), 400
+                    return jsonify({'error': '请先创建用户'}), 400
 
             current_date = datetime.now().strftime('%Y年%m月%d日')
 
@@ -777,8 +783,8 @@ def create_app():
                     'status': r.status,
                     'sender_name': r.sender_name,
                     'sender_email': r.sender_email,
-                    'created_at': r.created_at.isoformat(),
-                    'sent_at': _serialize_sent_at(r)
+                    'created_at': _serialize_datetime(r.created_at),
+                    'sent_at': _serialize_datetime(r.sent_at)
                 } for r in records],
                 'pagination': {
                     'page': pagination.page,
@@ -810,8 +816,8 @@ def create_app():
                 'status': r.status,
                 'sender_name': r.sender_name,
                 'sender_email': r.sender_email,
-                'created_at': r.created_at.isoformat(),
-                'sent_at': _serialize_sent_at(r)
+                'created_at': _serialize_datetime(r.created_at),
+                'sent_at': _serialize_datetime(r.sent_at)
             } for r in records])
         except Exception as e:
             logger.error(f"获取所有邮件记录失败: {e}")
@@ -834,9 +840,9 @@ def create_app():
                 'sender_name': record.sender_name,
                 'sender_email': record.sender_email,
                 'recipient_email': record.professor.email,
-                'send_time': _serialize_sent_at(record) if record.sent_at else record.created_at.isoformat(),
-                'created_at': record.created_at.isoformat(),
-                'sent_at': _serialize_sent_at(record)
+                'send_time': _serialize_datetime(record.sent_at) if record.sent_at else _serialize_datetime(record.created_at),
+                'created_at': _serialize_datetime(record.created_at),
+                'sent_at': _serialize_datetime(record.sent_at)
             })
         except Exception as e:
             logger.error(f"获取邮件记录详情失败: {str(e)}")
@@ -1025,33 +1031,7 @@ def create_app():
             logger.error(f"用户详情管理失败: {str(e)}")
             return jsonify({'error': str(e)}), 500
     
-    @app.route('/api/users/<int:user_id>/set-default', methods=['POST'])
-    def set_default_user(user_id):
-        """设置默认用户"""
-        try:
-            success, error = user_service.set_default_user(user_id)
-            if error:
-                return jsonify({'error': error}), 400
-            
-            return jsonify({'message': '默认用户设置成功'})
-            
-        except Exception as e:
-            logger.error(f"设置默认用户失败: {str(e)}")
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/users/default', methods=['GET'])
-    def get_default_user():
-        """获取默认用户"""
-        try:
-            user = user_service.get_default_user()
-            if user:
-                return jsonify(user.to_dict())
-            else:
-                return jsonify({'message': '未设置默认用户'}), 404
-                
-        except Exception as e:
-            logger.error(f"获取默认用户失败: {str(e)}")
-            return jsonify({'error': str(e)}), 500
+
     
     @app.route('/api/users/<int:user_id>/documents', methods=['GET'])
     def get_user_documents(user_id):
@@ -1339,9 +1319,10 @@ def create_app():
                 if not sender_profile:
                     return jsonify({'error': '选择的发送用户不存在或未激活'}), 400
             else:
-                sender_profile = user_service.get_default_user()
+                # 如果没有指定发送用户，选择第一个可用用户
+                sender_profile = UserProfile.query.filter_by(is_active=True).first()
                 if not sender_profile:
-                    return jsonify({'error': '请先设置默认用户'}), 400
+                    return jsonify({'error': '请先创建用户'}), 400
             
             # 获取文档内容（HTML格式）
             document_id = documents[0]['id']  # 使用第一个文档
@@ -1609,6 +1590,16 @@ def create_app():
             app.config['LOG_LEVEL'] = new_level
             app.config['LOG_FILE'] = safe_name
             app.config['CONSOLE_OUTPUT'] = new_console
+
+            # 保存设置到配置文件
+            log_settings = {
+                'log_settings': {
+                    'log_level': new_level,
+                    'log_file': safe_name,
+                    'console_output': new_console
+                }
+            }
+            Config.save_settings(log_settings)
 
             return jsonify({'success': True})
         except Exception as e:

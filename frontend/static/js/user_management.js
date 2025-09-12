@@ -378,7 +378,7 @@ function displayUsers(userList) {
     userListContainer.innerHTML = userList.map(user => `
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card user-card h-100 position-relative">
-                ${user.is_default ? '<span class="badge bg-success default-badge">默认</span>' : ''}
+
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
                         <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
@@ -401,11 +401,7 @@ function displayUsers(userList) {
                         <button class="btn btn-outline-primary btn-sm flex-fill" onclick="editUser(${user.id})">
                             <i class="bi bi-pencil me-1"></i>编辑
                         </button>
-                        ${!user.is_default ? `
-                            <button class="btn btn-outline-success btn-sm" onclick="setDefaultUser(${user.id})" title="设为默认">
-                                <i class="bi bi-star"></i>
-                            </button>
-                        ` : ''}
+
                         <button class="btn btn-outline-danger btn-sm" onclick="deleteUser(${user.id}, '${user.name}')" title="删除">
                             <i class="bi bi-trash"></i>
                         </button>
@@ -479,26 +475,7 @@ function deleteUser(userId, userName) {
     };
 }
 
-// 设置默认用户
-async function setDefaultUser(userId) {
-    try {
-        const response = await fetch(`/api/users/${userId}/set-default`, {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showAlert(result.message, 'success');
-            loadUsers();
-        } else {
-            showAlert(result.error || '设置失败', 'danger');
-        }
-    } catch (error) {
-        console.error('设置默认用户失败:', error);
-        showAlert('设置失败，请检查网络连接', 'danger');
-    }
-}
+
 
 // 重置表单
 function resetForm() {

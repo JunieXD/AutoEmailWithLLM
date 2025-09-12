@@ -167,9 +167,7 @@ class UserService:
                     db.session.rollback()
                     return None, error
             
-            # 如果是第一个用户，设为默认用户
-            if UserProfile.query.count() == 1:
-                user.is_default = True
+
             
             db.session.commit()
             return user, None
@@ -245,14 +243,7 @@ class UserService:
             if not user:
                 return False, '用户不存在'
             
-            # 如果是默认用户，需要先设置其他用户为默认
-            if user.is_default:
-                other_user = UserProfile.query.filter(
-                    UserProfile.id != user_id,
-                    UserProfile.is_active == True
-                ).first()
-                if other_user:
-                    other_user.is_default = True
+
             
             # 删除用户文件
             if user.cover_letter_path:
@@ -282,29 +273,7 @@ class UserService:
         """获取所有用户"""
         return UserProfile.query.filter_by(is_active=True).order_by(UserProfile.created_at.desc()).all()
     
-    def set_default_user(self, user_id):
-        """设置默认用户"""
-        try:
-            # 清除所有默认标记
-            UserProfile.query.update({'is_default': False})
-            
-            # 设置新的默认用户
-            user = db.session.get(UserProfile, user_id)
-            if not user:
-                return False, '用户不存在'
-            
-            user.is_default = True
-            db.session.commit()
-            return True, None
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f'设置默认用户失败: {str(e)}')
-            return False, f'设置默认用户失败: {str(e)}'
-    
-    def get_default_user(self):
-        """获取默认用户"""
-        return UserProfile.query.filter_by(is_default=True, is_active=True).first()
+
     
     def get_user_files(self, user_id):
         """获取用户文件列表"""

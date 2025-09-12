@@ -20,7 +20,6 @@ class UserProfile(db.Model):
     # 其他信息
     description = db.Column(db.Text, nullable=True, comment='个人描述')
     is_active = db.Column(db.Boolean, default=True, comment='是否激活')
-    is_default = db.Column(db.Boolean, default=False, comment='是否为默认用户')
     
     # 时间戳
     created_at = db.Column(db.DateTime, default=get_shanghai_utcnow, comment='创建时间')
@@ -38,7 +37,6 @@ class UserProfile(db.Model):
             'resume_path': self.resume_path,
             'description': self.description,
             'is_active': self.is_active,
-            'is_default': self.is_default,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -53,23 +51,7 @@ class UserProfile(db.Model):
             'smtp_port': self.smtp_port or 587
         }
     
-    @classmethod
-    def get_default_user(cls):
-        """获取默认用户"""
-        return cls.query.filter_by(is_default=True, is_active=True).first()
-    
-    @classmethod
-    def set_default_user(cls, user_id):
-        """设置默认用户"""
-        # 清除所有默认标记
-        cls.query.update({'is_default': False})
-        # 设置新的默认用户
-        user = db.session.get(cls, user_id)
-        if user:
-            user.is_default = True
-            db.session.commit()
-            return True
-        return False
+
     
     def __repr__(self):
         return f'<UserProfile {self.name} ({self.email})>'
